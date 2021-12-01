@@ -1,0 +1,15 @@
+github.com/f-secure-foundry/tamago v0.0.0-20210120185021-8387bb5064a1 h1:un4OVswTP2xNoXwTbW616QIbKgf9kLEnEmPBDZFYB3w=
+github.com/f-secure-foundry/tamago v0.0.0-20210120185021-8387bb5064a1/go.mod h1:+xmhdYxGfaNhWUZ/F1mbwFu38H73slg/k/oPjOL7tc8=
+github.com/fuzxxl/nfc/v2 v2.1.3/go.mod h1:I11FBJg/xqZnMu029uRebpKgaEx0N5Oe8AH+3L8e6Sk=
+github.com/google/go-cmp v0.5.5/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
+github.com/hsanjuan/go-ndef v0.0.1 h1:un1E9jEVa0t8j33qT2JFfseOAI3MikbrkmMEn9Lx0Wk=
+github.com/hsanjuan/go-ndef v0.0.1/go.mod h1:LqYM55xXg5wubrxucAxkuK8nW+wjFCCZNyfsd9lPR+Q=
+github.com/hsanjuan/go-nfctype4 v0.0.1 h1:70AYqa8/H2VPM1wscSmLYYk6OeeXXrmdBebLxx7p9sA=
+github.com/hsanjuan/go-nfctype4 v0.0.1/go.mod h1:wH9pPWl1xho2I0A3RITThTyX4ikcc1C2u75LUuixuTo=
+github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
+github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
+github.com/rakyll/statik v0.1.7 h1:OF3QCZUuyPxuGEP7B4ypUa7sB/iHtqOTDYZXGM8KOdQ=
+github.com/rakyll/statik v0.1.7/go.mod h1:AlZONWzMtEnMs7W4e/1LURLiI49pIMmp6V9Unghqrcc=
+github.com/skythen/apdu v0.1.1 h1:llINugX0FVRqgh+7qjuBWXHsrZud79Vi5nhvqwzjNcQ=
+github.com/skythen/apdu v0.1.1/go.mod h1:oWzDkx2dbgf312Gxmw74TfoE2CqkKJJAt2O/4/kvEIA=
+golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
