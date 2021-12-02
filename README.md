@@ -26,7 +26,7 @@ Example packet:
    |-> Channel ID
 ```
 
-The maximum amount of data each upper-level data packet can hold is 64-5 = 59 bytes.
+The maximum amount of data each upper-level data packet can hold is 64-7 = 57 bytes.
 
 An hypothetical Go struct representing a HID frame is the following:
 
@@ -41,3 +41,15 @@ type HIDFrame struct {
 ```
 
 The upper-level data packet framing is implementation-dependent, typically APDU is used.
+
+**PSA:** hypothesis ahead!
+
+Each packet can hold maximum of 57 bytes, times `max(uint16)` = 57 * 65535 = 3735495 bytes is the maximum amount of bytes we can send over this framing.
+
+AFAIS Ledger add a channel identification number _but_ doesn't really like being connected to multiple parties at the same time, AKA only one program running on the host can access the Ledger.
+
+This greatly simplifies how we reason about the system
+
+If we assume 57 bytes per packet received, `DataLength` should decrease for each packet we receive. 
+
+When `DataLength =< 57` it means the packet we just received is the last one and we can now pass the resulting data slice to the upper-level layer.
