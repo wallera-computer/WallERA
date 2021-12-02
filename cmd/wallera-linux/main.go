@@ -23,7 +23,7 @@ var (
 	attestationPrivkey []byte
 )
 
-// CosmosCLA...
+// CosmosCLA ...
 //go:generate stringer -type CosmosCLA
 type CosmosCLA byte
 
@@ -33,14 +33,17 @@ const (
 	claGetAddrSecp256K1 CosmosCLA = 0x04
 )
 
-type message struct {
-	ChannelID [2]byte
-	Garbage   [5]byte
-	Data      [57]byte
+// HIDFrame ...
+type HIDFrame struct {
+	ChannelID   uint16
+	Tag         uint8
+	PacketIndex uint16
+	DataLength  uint16
+	Data        [57]byte
 }
 
-func readMessage(in []byte) (message, error) {
-	ret := message{}
+func readMessage(in []byte) (HIDFrame, error) {
+	ret := HIDFrame{}
 	return ret, binary.Read(bytes.NewReader(in), binary.BigEndian, &ret)
 }
 
@@ -140,8 +143,7 @@ func (hidHandler) Rx(input []byte) ([]byte, error) {
 		log.Fatal(err)
 	}
 
-	log.Println("ChannelID:", h(msg.ChannelID[:]))
-	log.Println("data:", h(msg.Data[:]))
+	log.Printf("HID frame: %+v\n", msg)
 
 	packet := apdu.CAPDU{}
 	_, err = packet.Unmarshal(msg.Data[:])
