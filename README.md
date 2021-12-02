@@ -18,9 +18,9 @@ Example packet:
 
 ```
 [38 190 5 0 0 0 5 85 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]
- |___|  | |_| |____________________________________________________________________________________________________________________|
-   |    |  |												|
-   |	|  |												|-> Upper-level data packet
+ |___|  | |_| |_|  |________________________________________________________________________________________________________________|
+   |    |  |   |												|
+   |	|  |   |-> Upper-level data packet length								|-> Upper-level data packet
    |	|  |-> Packet index
    |	|-> Tag
    |-> Channel ID
@@ -33,10 +33,11 @@ An hypothetical Go struct representing a HID frame is the following:
 ```go
 type HIDFrame struct {
 	ChannelID   uint16
-	Tag 	    uint8
+	Tag         uint8
 	PacketIndex uint16
-	Data   	    [59]byte
+	DataLength  uint16
+	Data        [57]byte
 }
 ```
 
-The upper-level data packet framing is implementation-dependent.
+The upper-level data packet framing is implementation-dependent, typically APDU is used.
