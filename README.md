@@ -19,8 +19,8 @@ Example packet:
 ```
 [38 190 5 0 0 0 5 85 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]
  |___|  | |_| |_|  |________________________________________________________________________________________________________________|
-   |    |  |   |												|
-   |	|  |   |-> Upper-level data packet length								|-> Upper-level data packet
+   |    |  |   |	|-> Upper-level data packet
+   |	|  |   |-> Upper-level data packet length
    |	|  |-> Packet index
    |	|-> Tag
    |-> Channel ID
