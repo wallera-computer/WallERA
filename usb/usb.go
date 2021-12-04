@@ -117,6 +117,23 @@ func (s *Session) readFrame(frame HIDFrame) {
 	s.shouldReadMore = !(frame.DataLength <= hidFrameMaxDataSize)
 }
 
+func (s *Session) FormatResponse(data []byte) []byte {
+	hf := HIDFrame{
+		ChannelID:   s.channelID,
+		Tag:         hidFrameTag,
+		PacketIndex: 0,
+		DataLength:  uint16(len(data)), // TODO: format this to handle packet longer than 57 bytes
+		Data:        [57]byte{},
+	}
+
+	copy(hf.Data[:], data)
+
+	resp := &bytes.Buffer{}
+	binary.Write(resp, binary.BigEndian, hf)
+
+	return resp.Bytes()
+}
+
 // NewSession returns a Session initialized with whatever data frame contains.
 func NewSession(frame HIDFrame) (Session, error) {
 	if frame.PacketIndex != 0 {
