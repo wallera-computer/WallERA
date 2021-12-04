@@ -16,7 +16,7 @@ type App interface {
 	Name() string
 	ID() byte
 	Commands() (commandIDs []byte)
-	Handle(command byte, data []byte) (response []byte, err error)
+	Handle(command byte, data []byte) (response []byte, code [2]byte, err error)
 }
 
 type commandMapping struct {
@@ -97,5 +97,20 @@ func (h *Handler) Handle(packet apdu.CAPDU) ([]byte, error) {
 
 	app := h.appMap[appID]
 
-	return app.Handle(command, packet.Data)
+	respData, respCode, err := app.Handle(command, packet.Data)
+
+	return packageResponse(respData, respCode), err
+}
+
+func packageResponse(data []byte, code [2]byte) []byte {
+	pkt := apdu.RAPDU{
+		ResponseBody: data,
+		SW1:          code[0],
+		SW2:          code[1],
+	}
+
+	// Marshal never errors.
+	resp, _ := pkt.Marshal()
+
+	return resp
 }
