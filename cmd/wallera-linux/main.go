@@ -1,8 +1,6 @@
 package main
 
 import (
-	"bytes"
-	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"flag"
@@ -12,7 +10,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/hsanjuan/go-nfctype4/apdu"
+	"github.com/wallera-computer/wallera/apps"
+	"github.com/wallera-computer/wallera/apps/cosmos"
+	"github.com/wallera-computer/wallera/usb"
 )
 
 var (
@@ -22,30 +22,6 @@ var (
 	// ECDSA private key, used to sign registration requests
 	attestationPrivkey []byte
 )
-
-// CosmosCLA ...
-//go:generate stringer -type CosmosCLA
-type CosmosCLA byte
-
-const (
-	claGetVersion       CosmosCLA = 0x00
-	claSignSecp256K1    CosmosCLA = 0x02
-	claGetAddrSecp256K1 CosmosCLA = 0x04
-)
-
-// HIDFrame ...
-type HIDFrame struct {
-	ChannelID   uint16
-	Tag         uint8
-	PacketIndex uint16
-	DataLength  uint16
-	Data        [57]byte
-}
-
-func readMessage(in []byte) (HIDFrame, error) {
-	ret := HIDFrame{}
-	return ret, binary.Read(bytes.NewReader(in), binary.BigEndian, &ret)
-}
 
 func cliArgs() (hidg, configfsPath string, mustClean bool) {
 	flag.StringVar(&hidg, "hidg", "/dev/hidg0", "/dev/hidgX file descriptor path")
@@ -92,7 +68,12 @@ func main() {
 	// add 50ms delay in both rx and tx
 	// we don't wanna burn laptop cpus :^)
 
-	ha := hidHandler{}
+	ah := apps.NewHandler()
+	ah.Register(&cosmos.Cosmos{})
+
+	ha := hidHandler{
+		ah: ah,
+	}
 	// rx
 	go func() {
 		for {
@@ -134,27 +115,38 @@ func main() {
 	log.Println("exiting, call this binary with the '-clean' flag to clean hidg entries")
 }
 
-type hidHandler struct{}
+type hidHandler struct {
+	ah *apps.Handler
+}
 
-func (hidHandler) Rx(input []byte) ([]byte, error) {
+func (h hidHandler) Rx(input []byte) ([]byte, error) {
 	log.Println("input bytes:", input, "length:", len(input))
-	msg, err := readMessage(input)
+
+	frame, err := usb.ParseHIDFrame(input)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	log.Printf("HID frame: %+v\n", msg)
+	log.Printf("HID frame: %+v\n", frame)
 
-	packet := apdu.CAPDU{}
-	_, err = packet.Unmarshal(msg.Data[:])
+	session, err := usb.NewSession(frame)
 	if err != nil {
-		log.Println("apdu decode error,", err)
-		return nil, nil
+		log.Fatal(err)
+	}
+
+	log.Printf("session: %+v\n", session)
+
+	packet, err := session.CAPDU()
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	log.Printf("apdu packet: %+v\n", packet)
 
-	log.Println("requested command:", CosmosCLA(packet.INS).String())
+	resp, err := h.ah.Handle(packet)
+
+	log.Println("handler:", resp, err)
+
 	return nil, nil
 }
 
