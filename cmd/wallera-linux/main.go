@@ -1,26 +1,20 @@
 package main
 
 import (
+	"bytes"
 	"encoding/hex"
 	"errors"
 	"flag"
 	"log"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/wallera-computer/wallera/apps"
 	"github.com/wallera-computer/wallera/apps/cosmos"
 	"github.com/wallera-computer/wallera/usb"
-)
-
-var (
-	// X.509 attestation certificate, sent along in registration requests
-	attestationCertificate []byte
-
-	// ECDSA private key, used to sign registration requests
-	attestationPrivkey []byte
 )
 
 func cliArgs() (hidg, configfsPath string, mustClean bool) {
@@ -90,10 +84,10 @@ func main() {
 		}
 	}()
 
-	/*go func() {
+	go func() {
 		for {
 			time.Sleep(50 * time.Millisecond)
-			data, err := hid.Tx(nil, nil)
+			data, err := ha.Tx()
 			if err != nil {
 				log.Println("tx error:", err)
 				continue
@@ -106,7 +100,7 @@ func main() {
 			_, err = hidRx.Write(data)
 			notErr(err)
 		}
-	}()*/
+	}()
 
 	log.Println("running...")
 
@@ -117,9 +111,35 @@ func main() {
 
 type hidHandler struct {
 	ah *apps.Handler
+
+	outboundMutex  sync.Mutex
+	outboundBuffer []byte
 }
 
-func (h hidHandler) Rx(input []byte) ([]byte, error) {
+func (h *hidHandler) writeOutbound(data []byte) {
+	h.outboundMutex.Lock()
+	defer h.outboundMutex.Unlock()
+
+	h.outboundBuffer = data
+}
+
+func (h *hidHandler) readOutbound() []byte {
+	h.outboundMutex.Lock()
+	defer h.outboundMutex.Unlock()
+
+	ret := &bytes.Buffer{}
+	ret.Write(h.outboundBuffer)
+
+	h.outboundBuffer = []byte{}
+
+	return ret.Bytes()
+}
+
+func (h *hidHandler) Tx() ([]byte, error) {
+	return h.readOutbound(), nil
+}
+
+func (h *hidHandler) Rx(input []byte) ([]byte, error) {
 	log.Println("input bytes:", input, "length:", len(input))
 
 	frame, err := usb.ParseHIDFrame(input)
@@ -145,7 +165,13 @@ func (h hidHandler) Rx(input []byte) ([]byte, error) {
 
 	resp, err := h.ah.Handle(packet)
 
-	log.Println("handler:", resp, err)
+	resp = session.FormatResponse(resp)
+
+	log.Println("response:", resp, err)
+
+	if resp != nil {
+		h.writeOutbound(resp)
+	}
 
 	return nil, nil
 }
