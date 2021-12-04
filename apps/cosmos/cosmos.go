@@ -1,10 +1,13 @@
 package cosmos
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
 	"log"
 )
 
+//go:generate stringer -type command
 type command byte
 
 const (
@@ -14,6 +17,8 @@ const (
 	claSignSecp256K1    command = 0x02
 	claGetAddrSecp256K1 command = 0x04
 )
+
+var commandCodeOK = [2]byte{0x90, 0x00}
 
 type Cosmos struct {
 }
@@ -36,8 +41,9 @@ func (c *Cosmos) Commands() (commandIDs []byte) {
 	return ret
 }
 
-func (c *Cosmos) Handle(command byte, data []byte) (response []byte, err error) {
-	switch command {
+func (c *Cosmos) Handle(cmd byte, data []byte) (response []byte, code [2]byte, err error) {
+	log.Println("handling command", command(cmd).String())
+	switch cmd {
 	case byte(claGetVersion):
 		return c.handleGetVersion(data)
 	case byte(claSignSecp256K1):
@@ -46,19 +52,54 @@ func (c *Cosmos) Handle(command byte, data []byte) (response []byte, err error) 
 		return c.handleGetAddrSecp256K1(data)
 	default:
 		// TODO: handle this
-		return nil, fmt.Errorf("command not found")
+		return nil, [2]byte{}, fmt.Errorf("command not found")
 	}
 }
 
-func (c *Cosmos) handleGetVersion(data []byte) (response []byte, err error) {
-	log.Println("called handleGetVersion")
-	return nil, nil
+/*
+   test_mode: response[0] !== 0,
+   version: "" + response[1] + "." + response[2] + "." + response[3],
+   device_locked: response[4] === 1,
+   major: response[1],
+*/
+
+type version struct {
+	Major uint8
+	Minor uint8
+	Patch uint8
+}
+type getVersionResponse struct {
+	TestMode     uint8
+	Version      version
+	DeviceLocked uint8
 }
 
-func (c *Cosmos) handleSignSecp256K1(data []byte) (response []byte, err error) {
-	return nil, nil
+func (g getVersionResponse) Marshal() ([]byte, error) {
+	ret := &bytes.Buffer{}
+
+	err := binary.Write(ret, binary.BigEndian, g)
+
+	return ret.Bytes(), err
 }
 
-func (c *Cosmos) handleGetAddrSecp256K1(data []byte) (response []byte, err error) {
-	return nil, nil
+func (c *Cosmos) handleGetVersion(_ []byte) (response []byte, code [2]byte, err error) {
+	resp, err := getVersionResponse{
+		TestMode: 1,
+		Version: version{
+			Major: 42,
+			Minor: 42,
+			Patch: 42,
+		},
+		DeviceLocked: 0,
+	}.Marshal()
+
+	return resp, commandCodeOK, err
+}
+
+func (c *Cosmos) handleSignSecp256K1(data []byte) (response []byte, code [2]byte, err error) {
+	return nil, [2]byte{}, nil
+}
+
+func (c *Cosmos) handleGetAddrSecp256K1(data []byte) (response []byte, code [2]byte, err error) {
+	return nil, [2]byte{}, nil
 }
