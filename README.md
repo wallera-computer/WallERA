@@ -10,6 +10,8 @@ Either compile your own kernel or use `linux-zen`.
 1. `make wallera-linux`
 2. `sudo ./wallera-linux`
 
+[Here](https://github.com/wallera-computer/ledgerjs-examples) are some LedgerJS-based examples one can use to fiddle with the implementation.
+
 # HID transport packet format
 
 Each packet is 64 bytes in size, as specified by the HID report descriptor.
