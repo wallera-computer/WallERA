@@ -55,3 +55,7 @@ This greatly simplifies how we reason about the system
 If we assume 57 bytes per packet received, `DataLength` should decrease for each packet we receive. 
 
 When `DataLength =< 57` it means the packet we just received is the last one and we can now pass the resulting data slice to the upper-level layer.
+
+## TODO
+ - handle packets longer than 57 bytes (see `usb.Session.FormatResponse()`)
+ - handle error codes correctly when commands do not return properly (check what the client code expects)
