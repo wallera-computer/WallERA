@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/hex"
 	"errors"
 	"flag"
@@ -97,8 +96,11 @@ func main() {
 				continue
 			}
 
-			_, err = hidRx.Write(data)
-			notErr(err)
+			for _, chunk := range data {
+				_, err = hidRx.Write(chunk)
+				notErr(err)
+				log.Println("written chunk", chunk)
+			}
 		}
 	}()
 
@@ -113,29 +115,24 @@ type hidHandler struct {
 	ah *apps.Handler
 
 	outboundMutex  sync.Mutex
-	outboundBuffer []byte
+	outboundBuffer [][]byte
 }
 
-func (h *hidHandler) writeOutbound(data []byte) {
+func (h *hidHandler) writeOutbound(data [][]byte) {
 	h.outboundMutex.Lock()
 	defer h.outboundMutex.Unlock()
 
 	h.outboundBuffer = data
 }
 
-func (h *hidHandler) readOutbound() []byte {
+func (h *hidHandler) readOutbound() [][]byte {
 	h.outboundMutex.Lock()
 	defer h.outboundMutex.Unlock()
 
-	ret := &bytes.Buffer{}
-	ret.Write(h.outboundBuffer)
-
-	h.outboundBuffer = []byte{}
-
-	return ret.Bytes()
+	return h.outboundBuffer
 }
 
-func (h *hidHandler) Tx() ([]byte, error) {
+func (h *hidHandler) Tx() ([][]byte, error) {
 	return h.readOutbound(), nil
 }
 
@@ -156,21 +153,15 @@ func (h *hidHandler) Rx(input []byte) ([]byte, error) {
 
 	log.Printf("session: %+v\n", session)
 
-	packet, err := session.CAPDU()
+	resp, err := h.ah.Handle(session.Data())
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	log.Printf("apdu packet: %+v\n", packet)
+	chunks := session.FormatResponse(resp)
 
-	resp, err := h.ah.Handle(packet)
-
-	resp = session.FormatResponse(resp)
-
-	log.Println("response:", resp, err)
-
-	if resp != nil {
-		h.writeOutbound(resp)
+	if chunks != nil {
+		h.writeOutbound(chunks)
 	}
 
 	return nil, nil
