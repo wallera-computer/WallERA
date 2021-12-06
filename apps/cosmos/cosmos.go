@@ -6,6 +6,9 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
+
+	"github.com/wallera-computer/sacco.go"
+	"github.com/wallera-computer/wallera/apps/crypto"
 )
 
 //go:generate stringer -type command
@@ -110,17 +113,11 @@ func (c *Cosmos) handleSignSecp256K1(data []byte) (response []byte, code [2]byte
 	return nil, [2]byte{}, nil
 }
 
-type getAddressResponse struct {
-	PublicKey [33]byte
-	Address   [65]byte
-}
-
-func (g getAddressResponse) Marshal() ([]byte, error) {
-	ret := &bytes.Buffer{}
-
-	err := binary.Write(ret, binary.BigEndian, g)
-
-	return ret.Bytes(), err
+func buildGetAddressResponse(pubkey []byte, address string) []byte {
+	r := &bytes.Buffer{}
+	r.Write(pubkey)
+	r.WriteString(address)
+	return r.Bytes()
 }
 
 type getAddressRequest struct {
@@ -155,11 +152,11 @@ func hrpFromGetAddressRequest(r getAddressRequest, data []byte) string {
 	return string(data[6 : 6+r.HRPLength])
 }
 
-func derivationPathFromGetAddressRequest(r getAddressRequest, data []byte) derivationPath {
+func derivationPathFromGetAddressRequest(r getAddressRequest, data []byte) crypto.DerivationPath {
 	offset := 6 + r.HRPLength
 	base := data[offset : offset+20]
 
-	return derivationPath{
+	return crypto.DerivationPath{
 		Purpose:      0x80000000 ^ (binary.LittleEndian.Uint32(base[0:4])),
 		CoinType:     0x80000000 ^ (binary.LittleEndian.Uint32(base[4:8])),
 		Account:      0x80000000 ^ (binary.LittleEndian.Uint32(base[8:12])),
@@ -170,14 +167,6 @@ func derivationPathFromGetAddressRequest(r getAddressRequest, data []byte) deriv
 
 func displayAddrOnDevice(r getAddressRequest) bool {
 	return r.P1 == 0x01
-}
-
-type derivationPath struct {
-	Purpose      uint32
-	CoinType     uint32
-	Account      uint32
-	Change       uint32
-	AddressIndex uint32
 }
 
 func (c *Cosmos) handleGetAddrSecp256K1(data []byte) (response []byte, code [2]byte, err error) {
@@ -204,25 +193,26 @@ func (c *Cosmos) handleGetAddrSecp256K1(data []byte) (response []byte, code [2]b
 	}*/
 
 	dp := derivationPathFromGetAddressRequest(req, data)
-	log.Println("derivation path:", dp)
+	log.Println("derivation path:", dp.String())
 
-	gar := getAddressResponse{}
-
-	d, _ := hex.DecodeString("02963020258b9fae259da3ba669b29d06a165e319eba845f8857859a140426614e")
-
-	copy(gar.Address[:], []byte("cosmos1n99upe3x9ak39x4tnygswnvrdesv828cnrmm3v"))
-	copy(gar.PublicKey[:], d)
-
-	r := &bytes.Buffer{}
-	r.Write(d)
-	r.WriteString("cosmos1n99upe3x9ak39x4tnygswnvrdesv828cnrmm3v")
-	resp, err := gar.Marshal()
+	mnm, err := sacco.GenerateMnemonic()
 	if err != nil {
 		return nil, [2]byte{0x64, 0x00}, err
 	}
 
-	_ = resp
+	wl, err := sacco.FromMnemonic(hrp, mnm, dp.String())
+	if err != nil {
+		return nil, [2]byte{0x64, 0x00}, err
+	}
+
+	pk, err := wl.PublicKeyRaw.ECPubKey()
+	if err != nil {
+		return nil, [2]byte{0x64, 0x00}, err
+	}
 
 	// TODO: handle derivation path
-	return r.Bytes(), commandCodeOK, nil
+	return buildGetAddressResponse(
+		pk.SerializeCompressed(),
+		wl.Address,
+	), commandCodeOK, nil
 }
