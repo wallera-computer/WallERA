@@ -76,12 +76,28 @@ func (h *Handler) Register(apps ...App) error {
 
 }
 
+// unmarshalCAPDU returns a command APDU packet from data.
+func UnmarshalCAPDU(data []byte) (apdu.CAPDU, error) {
+	packet := apdu.CAPDU{}
+	_, err := packet.Unmarshal(data)
+	if err != nil {
+		return apdu.CAPDU{}, nil
+	}
+
+	return packet, nil
+}
+
 // Handle routes packet to the appropriate app handler.
 // It returns a byte slice containing a response for the USB host, and an error
 // which if present, should be logged.
-func (h *Handler) Handle(packet apdu.CAPDU) ([]byte, error) {
-	appID := packet.CLA
-	command := packet.INS
+func (h *Handler) Handle(data []byte) ([]byte, error) {
+	capdu, err := UnmarshalCAPDU(data)
+	if err != nil {
+		return nil, err
+	}
+
+	appID := capdu.CLA
+	command := capdu.INS
 
 	if !h.mappingExists(appID) {
 		// TODO: no app has been registered for this appID, return
@@ -97,7 +113,7 @@ func (h *Handler) Handle(packet apdu.CAPDU) ([]byte, error) {
 
 	app := h.appMap[appID]
 
-	respData, respCode, err := app.Handle(command, packet.Data)
+	respData, respCode, err := app.Handle(command, data)
 
 	return packageResponse(respData, respCode), err
 }
