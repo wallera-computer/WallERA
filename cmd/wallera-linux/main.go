@@ -129,7 +129,12 @@ func (h *hidHandler) readOutbound() [][]byte {
 	h.outboundMutex.Lock()
 	defer h.outboundMutex.Unlock()
 
-	return h.outboundBuffer
+	m := make([][]byte, len(h.outboundBuffer))
+	copy(m, h.outboundBuffer)
+
+	h.outboundBuffer = make([][]byte, 0)
+
+	return m
 }
 
 func (h *hidHandler) Tx() ([][]byte, error) {
