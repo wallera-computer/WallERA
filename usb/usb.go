@@ -4,8 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-
-	"github.com/hsanjuan/go-nfctype4/apdu"
+	"math"
 )
 
 const (
@@ -31,6 +30,14 @@ type HIDFrame struct {
 	PacketIndex uint16   // 2 bytes
 	DataLength  uint16   // 2 bytes
 	Data        [57]byte // 57 bytes
+}
+
+// HIDFrameNext represents a HID frame that comes with sequence number > 0
+type HIDFrameNext struct {
+	ChannelID   uint16   // 2 bytes
+	Tag         uint8    // 1 byte
+	PacketIndex uint16   // 2 bytes
+	Data        [59]byte // 57 bytes
 }
 
 // validate performs some basic validation on h.
@@ -75,21 +82,6 @@ type Session struct {
 	shouldReadMore     bool
 }
 
-// CAPDU returns a command APDU packet from s data.
-func (s Session) CAPDU() (apdu.CAPDU, error) {
-	if s.shouldReadMore {
-		return apdu.CAPDU{}, fmt.Errorf("cannot build apdu packet from incomplete data")
-	}
-
-	packet := apdu.CAPDU{}
-	_, err := packet.Unmarshal(s.data.Bytes())
-	if err != nil {
-		return apdu.CAPDU{}, nil
-	}
-
-	return packet, nil
-}
-
 // ReadFrame does some basic checks on frame, and if positive will read frame data into s.
 func (s *Session) ReadFrame(frame HIDFrame) error {
 	if !s.shouldReadMore {
@@ -117,21 +109,87 @@ func (s *Session) readFrame(frame HIDFrame) {
 	s.shouldReadMore = !(frame.DataLength <= hidFrameMaxDataSize)
 }
 
-func (s *Session) FormatResponse(data []byte) []byte {
+const (
+	defaultChunkSize = 57
+	nextChunkSize    = 59
+)
+
+func chunkFunc(data []byte, size int) [][]byte {
+	if len(data) <= size {
+		return [][]byte{data}
+	}
+
+	chunks := int(math.Ceil(float64(len(data)) / float64(size)))
+
+	ret := make([][]byte, 0, chunks)
+
+	start := 0
+	finish := size
+
+	for idx := 0; idx < chunks; idx++ {
+		if idx+1 == chunks {
+			finish = len(data)
+		}
+
+		ret = append(ret, data[start:finish])
+		start = start + size
+		finish = finish + size
+
+	}
+
+	return ret
+}
+
+func chunk(data []byte) [][]byte {
+	return chunkFunc(data, nextChunkSize)
+}
+
+func (s *Session) FormatResponse(data []byte) [][]byte {
+	firstChunk := data[0:defaultChunkSize]
+	data = data[defaultChunkSize:]
+
+	chunks := chunk(data)
+
+	ret := make([][]byte, 0, len(chunks))
+
+	// serialize first 57 bytes
 	hf := HIDFrame{
 		ChannelID:   s.channelID,
 		Tag:         hidFrameTag,
-		PacketIndex: 0,
-		DataLength:  uint16(len(data)), // TODO: format this to handle packet longer than 57 bytes
-		Data:        [57]byte{},
+		PacketIndex: uint16(0),
+		// DataLength is only present in the first HID response frame, and is composed by the
+		// first frame length along with the remaining data length.
+		DataLength: uint16(len(data) + len(firstChunk)),
+		Data:       [57]byte{},
 	}
 
-	copy(hf.Data[:], data)
+	copy(hf.Data[:], firstChunk)
 
 	resp := &bytes.Buffer{}
 	binary.Write(resp, binary.BigEndian, hf)
+	ret = append(ret, resp.Bytes())
 
-	return resp.Bytes()
+	for i, chunk := range chunks {
+		hf := HIDFrameNext{
+			ChannelID:   s.channelID,
+			Tag:         hidFrameTag,
+			PacketIndex: uint16(i + 1),
+			Data:        [59]byte{},
+		}
+
+		copy(hf.Data[:], chunk)
+
+		resp := &bytes.Buffer{}
+		binary.Write(resp, binary.BigEndian, hf)
+		ret = append(ret, resp.Bytes())
+	}
+
+	return ret
+}
+
+// TODO: harden this
+func (s *Session) Data() []byte {
+	return s.data.Bytes()
 }
 
 // NewSession returns a Session initialized with whatever data frame contains.
