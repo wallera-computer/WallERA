@@ -131,34 +131,80 @@ type getAddressRequest struct {
 	HRPLength     uint8
 }
 
+func (g getAddressRequest) validate() error {
+	if g.P1 > 1 {
+		return fmt.Errorf("first parameter cannot be greater than 1")
+	}
+
+	if g.PayloadLength > 255 {
+		return fmt.Errorf("total APDU payload length cannot exceed 255 bytes")
+	}
+
+	if g.PayloadLength == 0 {
+		return fmt.Errorf("no payload specified but should be present")
+	}
+
+	if g.HRPLength < 1 || g.HRPLength > 83 {
+		return fmt.Errorf("hrp length cannot be less than 1 or exceed 83, found %v", g.HRPLength)
+	}
+
+	return nil
+}
+
+func hrpFromGetAddressRequest(r getAddressRequest, data []byte) string {
+	return string(data[6 : 6+r.HRPLength])
+}
+
+func derivationPathFromGetAddressRequest(r getAddressRequest, data []byte) derivationPath {
+	offset := 6 + r.HRPLength
+	base := data[offset : offset+20]
+
+	return derivationPath{
+		Purpose:      0x80000000 ^ (binary.LittleEndian.Uint32(base[0:4])),
+		CoinType:     0x80000000 ^ (binary.LittleEndian.Uint32(base[4:8])),
+		Account:      0x80000000 ^ (binary.LittleEndian.Uint32(base[8:12])),
+		Change:       (binary.LittleEndian.Uint32(base[12:16])),
+		AddressIndex: (binary.LittleEndian.Uint32(base[16:20])),
+	}
+}
+
+func displayAddrOnDevice(r getAddressRequest) bool {
+	return r.P1 == 0x01
+}
+
+type derivationPath struct {
+	Purpose      uint32
+	CoinType     uint32
+	Account      uint32
+	Change       uint32
+	AddressIndex uint32
+}
+
 func (c *Cosmos) handleGetAddrSecp256K1(data []byte) (response []byte, code [2]byte, err error) {
 	req := getAddressRequest{}
 	if err := binary.Read(bytes.NewReader(data), binary.BigEndian, &req); err != nil {
-		return nil, commandErrEmptyBuffer, err
+		return nil, commandErrEmptyBuffer, err // TODO: correct error here
 	}
 
-	if req.PayloadLength == 0 {
-		return nil, commandCodeOK, fmt.Errorf("command packet is empty")
+	if err := req.validate(); err != nil {
+		return nil, commandErrWrongLength, err
 	}
 
-	displayAddrOnDevice := false
-	if req.P1 == 0x01 {
-		displayAddrOnDevice = true
-	}
+	log.Println("display on device:", displayAddrOnDevice(req))
 
-	log.Println("display on device:", displayAddrOnDevice)
-
-	data = data[6:req.PayloadLength]
-
-	log.Println("data:", data)
-	hrp := data[0:req.HRPLength]
-
+	hrp := hrpFromGetAddressRequest(req, data)
 	log.Println("requested hrp:", string(hrp))
+
+	// TODO: we're generating a random address + pubkey on each call for demo purposes
+	// please someone build a better design, thanks!
 
 	/*addr, err := bech32.Encode("cosmos", testBytes())
 	if err != nil {
 		return nil, [2]byte{0x64, 0x00}, err
 	}*/
+
+	dp := derivationPathFromGetAddressRequest(req, data)
+	log.Println("derivation path:", dp)
 
 	gar := getAddressResponse{}
 
