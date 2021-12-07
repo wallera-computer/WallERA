@@ -145,6 +145,27 @@ func chunk(data []byte) [][]byte {
 }
 
 func (s *Session) FormatResponse(data []byte) [][]byte {
+	if len(data) <= defaultChunkSize {
+		hf := HIDFrame{
+			ChannelID:   s.channelID,
+			Tag:         hidFrameTag,
+			PacketIndex: uint16(0),
+			// DataLength is only present in the first HID response frame, and is composed by the
+			// first frame length along with the remaining data length.
+			DataLength: uint16(len(data)),
+			Data:       [57]byte{},
+		}
+
+		copy(hf.Data[:], data)
+
+		resp := &bytes.Buffer{}
+		binary.Write(resp, binary.BigEndian, hf)
+
+		return [][]byte{
+			resp.Bytes(),
+		}
+	}
+
 	firstChunk := data[0:defaultChunkSize]
 	data = data[defaultChunkSize:]
 
