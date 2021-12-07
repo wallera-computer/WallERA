@@ -205,6 +205,9 @@ func (c *Cosmos) handleGetAddrSecp256K1(data []byte) (response []byte, code [2]b
 		return nil, [2]byte{0x64, 0x00}, err
 	}
 
+	log.Println("generated mnemonic:", mnm)
+	log.Println("generated address:", wl.Address)
+
 	pk, err := wl.PublicKeyRaw.ECPubKey()
 	if err != nil {
 		return nil, [2]byte{0x64, 0x00}, err
