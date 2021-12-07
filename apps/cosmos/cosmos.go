@@ -3,7 +3,6 @@ package cosmos
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"log"
 
@@ -20,19 +19,7 @@ const (
 	claGetVersion       command = 0x00
 	claSignSecp256K1    command = 0x02
 	claGetAddrSecp256K1 command = 0x04
-
-	// TODO: remove this
-	testAddrBytes = "994bc0e6262f6d129aab9911074d836e60c3a8f8"
 )
-
-func testBytes() []byte {
-	d, err := hex.DecodeString(testAddrBytes)
-	if err != nil {
-		panic(err)
-	}
-
-	return d
-}
 
 var (
 	commandCodeOK         = [2]byte{0x90, 0x00}
@@ -186,11 +173,6 @@ func (c *Cosmos) handleGetAddrSecp256K1(data []byte) (response []byte, code [2]b
 
 	// TODO: we're generating a random address + pubkey on each call for demo purposes
 	// please someone build a better design, thanks!
-
-	/*addr, err := bech32.Encode("cosmos", testBytes())
-	if err != nil {
-		return nil, [2]byte{0x64, 0x00}, err
-	}*/
 
 	dp := derivationPathFromGetAddressRequest(req, data)
 	log.Println("derivation path:", dp.String())
