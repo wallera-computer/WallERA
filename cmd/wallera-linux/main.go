@@ -116,6 +116,7 @@ type hidHandler struct {
 
 	outboundMutex  sync.Mutex
 	outboundBuffer [][]byte
+	session        *usb.Session
 }
 
 func (h *hidHandler) writeOutbound(data [][]byte) {
@@ -131,6 +132,11 @@ func (h *hidHandler) readOutbound() [][]byte {
 
 	m := make([][]byte, len(h.outboundBuffer))
 	copy(m, h.outboundBuffer)
+	if h.session != nil {
+		if !h.session.ShouldReadMore {
+			h.session = nil
+		}
+	}
 
 	h.outboundBuffer = make([][]byte, 0)
 
@@ -144,26 +150,44 @@ func (h *hidHandler) Tx() ([][]byte, error) {
 func (h *hidHandler) Rx(input []byte) ([]byte, error) {
 	log.Println("input bytes:", input, "length:", len(input))
 
-	frame, err := usb.ParseHIDFrame(input)
+	var frame usb.Frame
+	parseFunc := usb.ParseHIDFrame
+	if h.session != nil {
+		parseFunc = usb.ParseHIDFrameNext
+	}
+	frame, err := parseFunc(input)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	log.Printf("HID frame: %+v\n", frame)
 
-	session, err := usb.NewSession(frame)
+	if h.session == nil {
+		s, err := usb.NewSession(frame)
+		if err != nil {
+			log.Fatal(err)
+		}
+		h.session = &s
+	} else {
+		err := h.session.ReadFrame(frame)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	log.Printf("session: %+v\n", h.session)
+
+	if h.session.ShouldReadMore {
+		log.Println("should still read more data, continuing")
+		return nil, nil
+	}
+
+	resp, err := h.ah.Handle(h.session.Data())
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	log.Printf("session: %+v\n", session)
-
-	resp, err := h.ah.Handle(session.Data())
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	chunks := session.FormatResponse(resp)
+	chunks := h.session.FormatResponse(resp)
 
 	if chunks != nil {
 		h.writeOutbound(chunks)

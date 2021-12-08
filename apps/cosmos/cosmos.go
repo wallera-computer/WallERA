@@ -3,6 +3,7 @@ package cosmos
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"log"
 
@@ -97,7 +98,7 @@ func (c *Cosmos) handleGetVersion() (response []byte, code [2]byte, err error) {
 }
 
 func (c *Cosmos) handleSignSecp256K1(data []byte) (response []byte, code [2]byte, err error) {
-	return nil, [2]byte{}, nil
+	return nil, commandCodeOK, nil
 }
 
 func buildGetAddressResponse(pubkey []byte, address string) []byte {
@@ -156,6 +157,11 @@ func displayAddrOnDevice(r getAddressRequest) bool {
 	return r.P1 == 0x01
 }
 
+var (
+	generatedAddress string = "cosmos1n99upe3x9ak39x4tnygswnvrdesv828cnrmm3v"
+	generatedPubkey  []byte
+)
+
 func (c *Cosmos) handleGetAddrSecp256K1(data []byte) (response []byte, code [2]byte, err error) {
 	req := getAddressRequest{}
 	if err := binary.Read(bytes.NewReader(data), binary.BigEndian, &req); err != nil {
@@ -168,36 +174,44 @@ func (c *Cosmos) handleGetAddrSecp256K1(data []byte) (response []byte, code [2]b
 
 	log.Println("display on device:", displayAddrOnDevice(req))
 
-	hrp := hrpFromGetAddressRequest(req, data)
-	log.Println("requested hrp:", string(hrp))
+	hhh, _ := hex.DecodeString("02963020258b9fae259da3ba669b29d06a165e319eba845f8857859a140426614e")
+	generatedPubkey = hhh
+	if generatedAddress == "" {
+		hrp := hrpFromGetAddressRequest(req, data)
+		log.Println("requested hrp:", string(hrp))
 
-	// TODO: we're generating a random address + pubkey on each call for demo purposes
-	// please someone build a better design, thanks!
+		// TODO: we're generating a random address + pubkey on each call for demo purposes
+		// please someone build a better design, thanks!
 
-	dp := derivationPathFromGetAddressRequest(req, data)
-	log.Println("derivation path:", dp.String())
+		dp := derivationPathFromGetAddressRequest(req, data)
+		log.Println("derivation path:", dp.String())
 
-	mnm, err := sacco.GenerateMnemonic()
-	if err != nil {
-		return nil, [2]byte{0x64, 0x00}, err
-	}
+		mnm, err := sacco.GenerateMnemonic()
+		if err != nil {
+			return nil, [2]byte{0x64, 0x00}, err
+		}
 
-	wl, err := sacco.FromMnemonic(hrp, mnm, dp.String())
-	if err != nil {
-		return nil, [2]byte{0x64, 0x00}, err
-	}
+		wl, err := sacco.FromMnemonic(hrp, mnm, dp.String())
+		if err != nil {
+			return nil, [2]byte{0x64, 0x00}, err
+		}
 
-	log.Println("generated mnemonic:", mnm)
-	log.Println("generated address:", wl.Address)
+		generatedAddress = wl.Address
 
-	pk, err := wl.PublicKeyRaw.ECPubKey()
-	if err != nil {
-		return nil, [2]byte{0x64, 0x00}, err
+		log.Println("generated mnemonic:", mnm)
+		log.Println("generated address:", wl.Address)
+
+		pk, err := wl.PublicKeyRaw.ECPubKey()
+		if err != nil {
+			return nil, [2]byte{0x64, 0x00}, err
+		}
+
+		generatedPubkey = pk.SerializeCompressed()
 	}
 
 	// TODO: handle derivation path
 	return buildGetAddressResponse(
-		pk.SerializeCompressed(),
-		wl.Address,
+		generatedPubkey,
+		generatedAddress,
 	), commandCodeOK, nil
 }
