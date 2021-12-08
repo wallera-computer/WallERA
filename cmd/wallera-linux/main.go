@@ -150,26 +150,14 @@ func (h *hidHandler) Tx() ([][]byte, error) {
 func (h *hidHandler) Rx(input []byte) ([]byte, error) {
 	log.Println("input bytes:", input, "length:", len(input))
 
-	var frame usb.Frame
-	parseFunc := usb.ParseHIDFrame
-	if h.session != nil {
-		parseFunc = usb.ParseHIDFrameNext
-	}
-	frame, err := parseFunc(input)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	log.Printf("HID frame: %+v\n", frame)
-
 	if h.session == nil {
-		s, err := usb.NewSession(frame)
+		s, err := usb.NewSession(input)
 		if err != nil {
 			log.Fatal(err)
 		}
 		h.session = &s
 	} else {
-		err := h.session.ReadFrame(frame)
+		err := h.session.ReadData(input)
 		if err != nil {
 			log.Fatal(err)
 		}
