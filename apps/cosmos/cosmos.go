@@ -22,6 +22,15 @@ const (
 	claGetAddrSecp256K1 command = 0x04
 )
 
+//go:generate stringer -type signPayloadDescr
+type signPayloadDescr byte
+
+const (
+	signInit signPayloadDescr = 0
+	signAdd  signPayloadDescr = 1
+	signLast signPayloadDescr = 2
+)
+
 var (
 	commandCodeOK         = [2]byte{0x90, 0x00}
 	commandErrEmptyBuffer = [2]byte{0x69, 0x82}
@@ -98,6 +107,9 @@ func (c *Cosmos) handleGetVersion() (response []byte, code [2]byte, err error) {
 }
 
 func (c *Cosmos) handleSignSecp256K1(data []byte) (response []byte, code [2]byte, err error) {
+	payloadDescription := signPayloadDescr(data[2])
+
+	log.Println("sign payload description:", payloadDescription.String())
 	return nil, commandCodeOK, nil
 }
 
