@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"log"
 	"math"
 )
 
@@ -29,7 +30,15 @@ type Frame interface {
 	PacketIndex() uint16
 	DataLength() uint16
 	Data() []byte
+
+	Type() int
+	validate() error
 }
+
+const (
+	typeFrame     = 1
+	typeFrameNext = 2
+)
 
 // HIDFrame represents a HID frame compatible with LedgerJS implementation.
 type HIDFrame struct {
@@ -38,6 +47,10 @@ type HIDFrame struct {
 	PacketIndexInner uint16   // 2 bytes
 	DataLengthInner  uint16   // 2 bytes
 	DataInner        [57]byte // 57 bytes
+}
+
+func (hf HIDFrame) Type() int {
+	return typeFrame
 }
 
 func (hf HIDFrame) ChannelID() uint16 {
@@ -66,6 +79,10 @@ type HIDFrameNext struct {
 	TagInner         uint8    // 1 byte
 	PacketIndexInner uint16   // 2 bytes
 	DataInner        [59]byte // 57 bytes
+}
+
+func (hf HIDFrameNext) Type() int {
+	return typeFrameNext
 }
 
 func (hf HIDFrameNext) ChannelID() uint16 {
@@ -101,42 +118,30 @@ func (h HIDFrame) validate() error {
 	return nil
 }
 
-// ParseHIDFrame returns a HIDFrame from data.
-// If the frame is not encoded as a LedgerJS HID frame, this function will
-// return an error.
-func ParseHIDFrame(data []byte) (Frame, error) {
-	ret := HIDFrame{}
-
-	if len(data) > 64 || len(data) == 0 {
-		return HIDFrame{}, fmt.Errorf("data must be exactly 64 bytes long")
+// validate performs some basic validation on h.
+func (h HIDFrameNext) validate() error {
+	if h.TagInner != hidFrameTag {
+		return fmt.Errorf("invalid frame tag")
 	}
 
-	if err := binary.Read(bytes.NewReader(data), binary.BigEndian, &ret); err != nil {
-		return HIDFrame{}, fmt.Errorf("invalid data, %w", err)
+	if h.ChannelIDInner == 0 {
+		return fmt.Errorf("channel id cannot be zero")
 	}
 
-	if err := ret.validate(); err != nil {
-		return HIDFrame{}, fmt.Errorf("frame validation failed, %w", err)
-	}
-
-	return ret, nil
+	return nil
 }
 
-// ParseHIDFrameNext returns a HIDFrame from data.
-// If the frame is not encoded as a LedgerJS HID frame, this function will
-// return an error.
-func ParseHIDFrameNext(data []byte) (Frame, error) {
-	ret := HIDFrameNext{}
-
+// readFrame reads data into dest, returning an error if any.
+func readFrame(data []byte, dest Frame) error {
 	if len(data) > 64 || len(data) == 0 {
-		return HIDFrameNext{}, fmt.Errorf("data must be exactly 64 bytes long")
+		return fmt.Errorf("data must be exactly 64 bytes long")
 	}
 
-	if err := binary.Read(bytes.NewReader(data), binary.BigEndian, &ret); err != nil {
-		return HIDFrameNext{}, fmt.Errorf("invalid data, %w", err)
+	if err := binary.Read(bytes.NewReader(data), binary.BigEndian, dest); err != nil {
+		return fmt.Errorf("invalid data, %w", err)
 	}
 
-	return ret, nil
+	return nil
 }
 
 // Session represents a single data transmission session, identified by its channel ID.
@@ -145,12 +150,39 @@ type Session struct {
 	lastReadFrameIndex uint16
 	data               *bytes.Buffer
 	ShouldReadMore     bool
-	didReadFirst       bool
 	amountToRead       uint16
+}
+
+// ReadData reads data into s.
+// If this method is called on a fresh instance of Session, data will be handled as a HIDFrame,
+// otherwise as a HIDFrameNext.
+func (s *Session) ReadData(data []byte) error {
+	var dest Frame
+
+	dest = &HIDFrame{}
+	if s.channelID != 0 {
+		dest = &HIDFrameNext{}
+	}
+
+	err := readFrame(data, dest)
+	if err != nil {
+		return err
+	}
+
+	if err := dest.validate(); err != nil {
+		return err
+	}
+
+	return s.ReadFrame(dest)
 }
 
 // ReadFrame does some basic checks on frame, and if positive will read frame data into s.
 func (s *Session) ReadFrame(frame Frame) error {
+	if s.channelID == 0 { // we're reading first frame
+		s.readFrame(frame)
+		return nil
+	}
+
 	if !s.ShouldReadMore {
 		return fmt.Errorf("cannot read any more data in this session")
 	}
@@ -169,22 +201,31 @@ func (s *Session) ReadFrame(frame Frame) error {
 }
 
 func (s *Session) readFrame(frame Frame) {
-	if !s.didReadFirst {
-		s.didReadFirst = true
-	}
+	s.channelID = frame.ChannelID()
 
 	s.lastReadFrameIndex = frame.PacketIndex()
 
 	s.data.Write(frame.Data()[:])
 
-	if frame.DataLength() != 0 {
+	if frame.Type() == typeFrame {
+		// we check against hidFrameMaxDataSize because if we're here
+		// we're reading a HIDFrame, hence it might be all done in
+		// a single frame.
 		s.ShouldReadMore = !(frame.DataLength() <= hidFrameMaxDataSize)
 		s.amountToRead = frame.DataLength()
+		log.Println("expected amount to read:", s.amountToRead)
 	}
 
-	// TODO: this thing is wrong shomehow
-	if s.data.Len() == int(s.amountToRead) {
+	if s.data.Len() >= int(s.amountToRead) {
+		// since we read the entirety of the data field in s.data,
+		// when this condition is true it means we finished writing, but
+		// we must trim the data to s.amountToRead.
 		s.ShouldReadMore = false
+
+		lenBefTrunc := s.data.Len()
+		s.data.Truncate(int(s.amountToRead))
+		lenAftTrunc := s.data.Len()
+		log.Println("len before truncation", lenBefTrunc, "after", lenAftTrunc)
 	}
 }
 
@@ -293,17 +334,16 @@ func (s *Session) Data() []byte {
 }
 
 // NewSession returns a Session initialized with whatever data frame contains.
-func NewSession(frame Frame) (Session, error) {
-	if frame.PacketIndex() != 0 {
-		return Session{}, fmt.Errorf("cannot create Session for non-first packet")
-	}
-
+func NewSession(data []byte) (Session, error) {
 	s := Session{
-		channelID: frame.ChannelID(),
-		data:      &bytes.Buffer{},
+		data:           &bytes.Buffer{},
+		ShouldReadMore: true,
 	}
 
-	s.readFrame(frame)
+	err := s.ReadData(data)
+	if err != nil {
+		return Session{}, err
+	}
 
 	return s, nil
 }
