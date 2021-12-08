@@ -38,6 +38,7 @@ var (
 )
 
 type Cosmos struct {
+	currentSignatureSession *signatureSession
 }
 
 func (c *Cosmos) Name() string {
@@ -106,10 +107,57 @@ func (c *Cosmos) handleGetVersion() (response []byte, code [2]byte, err error) {
 	return resp, commandCodeOK, err
 }
 
+type signatureSession struct {
+	derivationPath crypto.DerivationPath
+	data           *bytes.Buffer
+}
+
 func (c *Cosmos) handleSignSecp256K1(data []byte) (response []byte, code [2]byte, err error) {
 	payloadDescription := signPayloadDescr(data[2])
-
 	log.Println("sign payload description:", payloadDescription.String())
+
+	if c.currentSignatureSession == nil && payloadDescription != signInit {
+		return nil, commandErrEmptyBuffer, fmt.Errorf("wrong signature description with no session initialized, %v", payloadDescription.String())
+	}
+
+	if payloadDescription == signInit {
+		c.currentSignatureSession = &signatureSession{
+			data: &bytes.Buffer{},
+		}
+	}
+
+	data = data[5:]
+	switch payloadDescription {
+	case signInit:
+		c.currentSignatureSession.derivationPath = crypto.NewDerivationPathFromBytes(
+			data[0:4],
+			data[4:8],
+			data[8:12],
+			data[12:16],
+			data[16:20],
+		)
+
+		log.Println("read derivation path in sign init:", c.currentSignatureSession.derivationPath.String())
+	case signAdd, signLast:
+		log.Println("writing data to sigsession:", len(data))
+		c.currentSignatureSession.data.Write(data)
+	}
+
+	if payloadDescription != signLast {
+		log.Println("not continuing with signature since we're not in signLast")
+		return nil, commandCodeOK, nil
+	}
+
+	defer func(c *Cosmos) {
+		c.currentSignatureSession = nil
+	}(c)
+
+	// len(sigBytes) will be always 10 bytes less than the session data as a whole,
+	// because we're trimming the APDU header for signAdd and signLast.
+	sigBytes := c.currentSignatureSession.data.Bytes()
+	log.Println("complete signature payload:", sigBytes)
+	log.Println("sigBytes len:", len(sigBytes))
+
 	return nil, commandCodeOK, nil
 }
 
@@ -156,13 +204,13 @@ func derivationPathFromGetAddressRequest(r getAddressRequest, data []byte) crypt
 	offset := 6 + r.HRPLength
 	base := data[offset : offset+20]
 
-	return crypto.DerivationPath{
-		Purpose:      0x80000000 ^ (binary.LittleEndian.Uint32(base[0:4])),
-		CoinType:     0x80000000 ^ (binary.LittleEndian.Uint32(base[4:8])),
-		Account:      0x80000000 ^ (binary.LittleEndian.Uint32(base[8:12])),
-		Change:       (binary.LittleEndian.Uint32(base[12:16])),
-		AddressIndex: (binary.LittleEndian.Uint32(base[16:20])),
-	}
+	return crypto.NewDerivationPathFromBytes(
+		base[0:4],
+		base[4:8],
+		base[8:12],
+		base[12:16],
+		base[16:20],
+	)
 }
 
 func displayAddrOnDevice(r getAddressRequest) bool {
