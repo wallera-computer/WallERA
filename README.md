@@ -67,10 +67,31 @@ If we assume 57 bytes per packet received, `DataLength` should decrease for each
 
 When `DataLength =< 57` it means the packet we just received is the last one and we can now pass the resulting data slice to the upper-level layer.
 
-## TODO
- - handle error codes correctly when commands do not return properly (check what the client code expects)
+## TODO & quirks
 
-### Cosmos App
+Short summary:
+
+ - handle error codes correctly when commands do not return properly (check what the client code expects)
+ - design an extensible `crypto` package
+
+### TODO: `crypto` package
+
+Most (if not all) cryptocurrencies use the same cryptographic primitives (variations of secp256k1, BIP-44 and BIP-39).
+
+We should design an interface for the `crypto` package which is extensible and usable in both development sessions (so through `wallera-linux`) and on secure hardware (ARM TrustZone, USB Armory Mk.II).
+
+Ideally we should design the secret derivation algorithm in a way that "derives secrets from secrets".
+
+Given a "transformation box", a constant diversifier is fed to it and the resulting 256 bits of entropy gets used in the BIP-39 derivation algorithm.
+
+For the USB Armory Mk.II we could use the integrated AES secret key in the following way:
+ - let `div` be the constant diversifier
+ - let `aes(div)` be the result of AES encryption of `div` with the i.MX6 secret, fused AES key
+ - the entropy from which the BIP-39 mnemonic is generated is the result of `SHA256(aes(div))`
+
+On `wallera-linux` we could simply embed a byte slice at compile-time, so that everybody uses the same test keys.
+
+### Quirks: Cosmos App
 
 APDU packet schema is [here](https://github.com/LedgerHQ/app-cosmos/blob/master/docs/APDUSPEC.md)
 
