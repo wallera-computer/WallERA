@@ -77,7 +77,10 @@ func (dt *dumbToken) Initialize(path crypto.DerivationPath) error {
 		return err
 	}
 
-	dt.privKey = sb
+	dt.privKey, err = crypto.KeyFromPath(sb, path)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -128,4 +131,9 @@ func (dt *dumbToken) SupportedSignAlgorithms() []crypto.Algorithm {
 	return []crypto.Algorithm{
 		crypto.AlgoSecp256K1,
 	}
+}
+
+func (dt *dumbToken) Clone() crypto.Token {
+	cl := *dt
+	return &cl
 }
