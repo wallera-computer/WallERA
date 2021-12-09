@@ -154,6 +154,13 @@ func (c *Cosmos) handleSignSecp256K1(data []byte) (response []byte, code [2]byte
 		c.currentSignatureSession = nil
 	}(c)
 
+	// we need to clone the Token instance because the derivation path passed as argument in signInit
+	// might differ from the one we used to initialize the token before.
+	sessionToken := c.Token.Clone()
+	if err := sessionToken.Initialize(c.currentSignatureSession.derivationPath); err != nil {
+		return nil, commandErrEmptyBuffer, err
+	}
+
 	// len(sigBytes) will be always 10 bytes less than the session data as a whole,
 	// because we're trimming the APDU header for signAdd and signLast.
 	sigBytes := c.currentSignatureSession.data.Bytes()
@@ -162,7 +169,7 @@ func (c *Cosmos) handleSignSecp256K1(data []byte) (response []byte, code [2]byte
 	log.Println("sigBytes str:", string(sigBytes))
 
 	sbHash := sha256.Sum256(sigBytes)
-	resp, err := c.Token.Sign(sbHash[:], crypto.AlgoSecp256K1)
+	resp, err := sessionToken.Sign(sbHash[:], crypto.AlgoSecp256K1)
 	if err != nil {
 		return nil, commandErrWrongLength, err
 	}
