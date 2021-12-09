@@ -3,6 +3,8 @@ package crypto
 import (
 	"encoding/binary"
 	"fmt"
+
+	"github.com/btcsuite/btcutil/hdkeychain"
 )
 
 type Algorithm uint
@@ -54,6 +56,7 @@ type Token interface {
 	Sign(data []byte, algorithm Algorithm) ([]byte, error)
 	PublicKey() ([]byte, error)
 	Mnemonic() ([]string, error)
+	Clone() Token
 	SupportedSignAlgorithms() []Algorithm
 }
 
@@ -84,4 +87,43 @@ func (d DerivationPath) String() string {
 		d.Change,
 		d.AddressIndex,
 	)
+}
+
+// InOrder returns derivation path components in order left to right, as described by the definition string
+// specification.
+func (d DerivationPath) InOrder() []uint32 {
+	return []uint32{
+		d.Purpose,
+		d.CoinType,
+		d.Account,
+		d.Change,
+		d.AddressIndex,
+	}
+}
+
+// KeyFromPath derives as new hdkeychain.ExtendedKey at a given path, hardening purpose, coin type and account level by default.
+func KeyFromPath(privateKey *hdkeychain.ExtendedKey, path DerivationPath) (*hdkeychain.ExtendedKey, error) {
+	var child *hdkeychain.ExtendedKey
+	var err error
+
+	components := path.InOrder()
+	for idx, component := range components {
+		k := child
+		if k == nil {
+			k = privateKey
+		}
+
+		mustHarden := idx <= 2
+
+		if mustHarden {
+			component = component + hdkeychain.HardenedKeyStart
+		}
+		child, err = k.Child(component)
+
+		if err != nil {
+			return nil, fmt.Errorf("cannot generate child key for path %v", components[:idx])
+		}
+	}
+
+	return child, nil
 }
