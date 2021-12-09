@@ -14,7 +14,7 @@ LDFLAGS = -s -w -T $(TEXT_START) -E _rt0_arm_tamago -R 0x1000 -X 'main.Build=${B
 GOFLAGS = -tags ${TARGET} -ldflags "${LDFLAGS}"
 SHELL = /bin/bash
 
-.PHONY: clean install test wallera-linux
+.PHONY: clean install test wallera-linux setup-wallera-linux
 
 #### primary targets ####
 
@@ -70,6 +70,12 @@ install: $(APP)
 
 wallera-linux:
 	$(TAMAGO) build -tags='wallera_logs' -gcflags "all=-N -l" -o ./wallera-linux ./cmd/wallera-linux 
+
+setup-wallera-linux: wallera-linux
+	@echo "You will be prompted for your root password, because we have to load some kernel modules and setup permissions"
+	sudo ./wallera-linux -setup
+	sudo bash cmd/wallera-linux/load_kernel_modules.sh $$USER
+
 #### dependencies ####
 $(APP): check_tamago
 	$(GOENV) $(TAMAGO) build ${GOFLAGS} -o ${APP} ./firmware/
