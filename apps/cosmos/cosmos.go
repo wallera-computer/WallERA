@@ -8,7 +8,7 @@ import (
 	"log"
 
 	"github.com/wallera-computer/sacco.go"
-	"github.com/wallera-computer/wallera/apps/crypto"
+	"github.com/wallera-computer/wallera/crypto"
 )
 
 //go:generate stringer -type command
