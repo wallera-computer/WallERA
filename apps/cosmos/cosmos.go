@@ -2,13 +2,14 @@ package cosmos
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"log"
 
-	"github.com/wallera-computer/sacco.go"
+	"github.com/cosmos/btcutil/bech32"
 	"github.com/wallera-computer/wallera/crypto"
+	"golang.org/x/crypto/ripemd160"
 )
 
 //go:generate stringer -type command
@@ -39,6 +40,7 @@ var (
 
 type Cosmos struct {
 	currentSignatureSession *signatureSession
+	Token                   crypto.Token
 }
 
 func (c *Cosmos) Name() string {
@@ -157,8 +159,16 @@ func (c *Cosmos) handleSignSecp256K1(data []byte) (response []byte, code [2]byte
 	sigBytes := c.currentSignatureSession.data.Bytes()
 	log.Println("complete signature payload:", sigBytes)
 	log.Println("sigBytes len:", len(sigBytes))
+	log.Println("sigBytes str:", string(sigBytes))
 
-	return nil, commandCodeOK, nil
+	sbHash := sha256.Sum256(sigBytes)
+	resp, err := c.Token.Sign(sbHash[:], crypto.AlgoSecp256K1)
+	if err != nil {
+		return nil, commandErrWrongLength, err
+	}
+
+	log.Println("length signature:", len(resp))
+	return resp, commandCodeOK, nil
 }
 
 func buildGetAddressResponse(pubkey []byte, address string) []byte {
@@ -217,11 +227,6 @@ func displayAddrOnDevice(r getAddressRequest) bool {
 	return r.P1 == 0x01
 }
 
-var (
-	generatedAddress string = "cosmos1n99upe3x9ak39x4tnygswnvrdesv828cnrmm3v"
-	generatedPubkey  []byte
-)
-
 func (c *Cosmos) handleGetAddrSecp256K1(data []byte) (response []byte, code [2]byte, err error) {
 	req := getAddressRequest{}
 	if err := binary.Read(bytes.NewReader(data), binary.BigEndian, &req); err != nil {
@@ -234,44 +239,53 @@ func (c *Cosmos) handleGetAddrSecp256K1(data []byte) (response []byte, code [2]b
 
 	log.Println("display on device:", displayAddrOnDevice(req))
 
-	hhh, _ := hex.DecodeString("02963020258b9fae259da3ba669b29d06a165e319eba845f8857859a140426614e")
-	generatedPubkey = hhh
-	if generatedAddress == "" {
-		hrp := hrpFromGetAddressRequest(req, data)
-		log.Println("requested hrp:", string(hrp))
+	hrp := hrpFromGetAddressRequest(req, data)
+	log.Println("requested hrp:", string(hrp))
 
-		// TODO: we're generating a random address + pubkey on each call for demo purposes
-		// please someone build a better design, thanks!
+	// TODO: we're generating a random address + pubkey on each call for demo purposes
+	// please someone build a better design, thanks!
 
-		dp := derivationPathFromGetAddressRequest(req, data)
-		log.Println("derivation path:", dp.String())
+	dp := derivationPathFromGetAddressRequest(req, data)
+	log.Println("derivation path:", dp.String())
 
-		mnm, err := sacco.GenerateMnemonic()
-		if err != nil {
-			return nil, [2]byte{0x64, 0x00}, err
-		}
-
-		wl, err := sacco.FromMnemonic(hrp, mnm, dp.String())
-		if err != nil {
-			return nil, [2]byte{0x64, 0x00}, err
-		}
-
-		generatedAddress = wl.Address
-
-		log.Println("generated mnemonic:", mnm)
-		log.Println("generated address:", wl.Address)
-
-		pk, err := wl.PublicKeyRaw.ECPubKey()
-		if err != nil {
-			return nil, [2]byte{0x64, 0x00}, err
-		}
-
-		generatedPubkey = pk.SerializeCompressed()
+	pubkey, err := c.Token.PublicKey()
+	if err != nil {
+		return nil, commandErrWrongLength, err
 	}
+
+	address, err := addressFromPubkey(pubkey, hrp)
+	if err != nil {
+		return nil, commandErrWrongLength, err
+	}
+
+	log.Println("generated address:", address)
 
 	// TODO: handle derivation path
 	return buildGetAddressResponse(
-		generatedPubkey,
-		generatedAddress,
+		pubkey,
+		address,
 	), commandCodeOK, nil
+}
+
+func addressFromPubkey(pubkey []byte, hrp string) (string, error) {
+	sha := sha256.Sum256(pubkey)
+	s := sha[:]
+	r := ripemd160.New()
+	_, err := r.Write(s)
+	if err != nil {
+		return "", err
+	}
+	pub := r.Sum(nil)
+
+	converted, err := bech32.ConvertBits(pub, 8, 5, true)
+	if err != nil {
+		return "", err
+	}
+
+	addr, err := bech32.Encode(hrp, converted)
+	if err != nil {
+		return "", err
+	}
+
+	return addr, nil
 }
