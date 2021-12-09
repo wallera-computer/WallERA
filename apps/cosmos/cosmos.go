@@ -40,7 +40,7 @@ var (
 
 type Cosmos struct {
 	currentSignatureSession *signatureSession
-	Token                   crypto.Token
+	Token                   crypto.Token // TODO: find a way to make this stateless, private key can be just derived each time
 }
 
 func (c *Cosmos) Name() string {
