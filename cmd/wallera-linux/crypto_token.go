@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
@@ -94,11 +93,7 @@ func (dt *dumbToken) Sign(data []byte, algorithm crypto.Algorithm) ([]byte, erro
 		return nil, err
 	}
 
-	r := &bytes.Buffer{}
-	r.Write(signature.R.Bytes())
-	r.Write(signature.S.Bytes())
-
-	return r.Bytes(), nil
+	return signature.Serialize(), nil
 }
 
 func (dt *dumbToken) PublicKey() ([]byte, error) {
