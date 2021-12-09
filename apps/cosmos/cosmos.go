@@ -255,6 +255,10 @@ func (c *Cosmos) handleGetAddrSecp256K1(data []byte) (response []byte, code [2]b
 	dp := derivationPathFromGetAddressRequest(req, data)
 	log.Println("derivation path:", dp.String())
 
+	if err := c.Token.Initialize(dp); err != nil {
+		return nil, commandErrWrongLength, err
+	}
+
 	pubkey, err := c.Token.PublicKey()
 	if err != nil {
 		return nil, commandErrWrongLength, err
