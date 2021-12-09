@@ -6,12 +6,8 @@ import (
 	"runtime"
 	"runtime/debug"
 
-	"github.com/wallera-computer/wallera/firmware/leds"
-
 	usbarmory "github.com/f-secure-foundry/tamago/board/f-secure/usbarmory/mark-two"
 	"github.com/f-secure-foundry/tamago/soc/imx6"
-
-	_ "github.com/wallera-computer/wallera/firmware/certs"
 )
 
 var (
@@ -30,7 +26,7 @@ func init() {
 		Revision, Build)
 
 	log.SetFlags(log.Lshortfile)
-	enableLogs()
+	//enableLogs()
 
 	model := imx6.Model()
 	_, family, revMajor, revMinor := imx6.SiliconVersion()
@@ -53,9 +49,9 @@ func init() {
 		panic(err)
 	}
 
-	readCertPrivkey()
+	//readCertPrivkey()
 
-	leds.StartBlink()
+	//leds.StartBlink()
 }
 
 func main() {
@@ -91,13 +87,13 @@ func main() {
 		store = st
 	}*/
 
-	counter, err := readSdCounter()
+	/*counter, err := readSdCounter()
 	if err != nil {
 		panic(err)
 	}
 
 	k := genKeyring(attestationPrivkey, counter)
-	startUSB(k)
+	startUSB(k)*/
 }
 
 func rebootWatcher() {
@@ -122,7 +118,7 @@ func rebootWatcher() {
 // catchPanic catches every panic(), sets the LEDs into error mode and prints the stacktrace.
 func catchPanic() {
 	if r := recover(); r != nil {
-		leds.Panic()
+		//leds.Panic()
 		fmt.Printf("panic: %v\n\n", r)
 		fmt.Println(string(debug.Stack()))
 

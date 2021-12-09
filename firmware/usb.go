@@ -1,12 +1,8 @@
 package main
 
 import (
+	"github.com/99designs/keyring"
 	"github.com/f-secure-foundry/tamago/soc/imx6/usb"
-
-	"github.com/wallera-computer/wallera"
-	"github.com/wallera-computer/wallera/keyring"
-	"github.com/wallera-computer/wallera/u2fhid"
-	"github.com/wallera-computer/wallera/u2ftoken"
 )
 
 func baseConfiguration(device *usb.Device) {
@@ -43,7 +39,7 @@ func baseConfiguration(device *usb.Device) {
 }
 
 func startUSB(keyring *keyring.Keyring) {
-	device := &usb.Device{}
+	/*device := &usb.Device{}
 
 	token, err := u2ftoken.New(keyring, attestationCertificate, attestationPrivkey)
 	notErr(err)
@@ -66,5 +62,5 @@ func startUSB(keyring *keyring.Keyring) {
 	usb.USB1.Reset()
 
 	// never returns
-	usb.USB1.Start(device)
+	usb.USB1.Start(device)*/
 }
