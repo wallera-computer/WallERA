@@ -14,4 +14,4 @@ for i in ${MODULES[@]}; do
     modprobe $i
 done
 
-chown $USER /dev/hidg0
+chown $1 /dev/hidg0
