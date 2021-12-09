@@ -12,6 +12,7 @@ import (
 
 	"github.com/wallera-computer/wallera/apps"
 	"github.com/wallera-computer/wallera/apps/cosmos"
+	"github.com/wallera-computer/wallera/crypto"
 	"github.com/wallera-computer/wallera/usb"
 )
 
@@ -77,12 +78,25 @@ func main() {
 	// add 50ms delay in both rx and tx
 	// we don't wanna burn laptop cpus :^)
 
+	t := &dumbToken{}
+	err = t.Initialize(crypto.DerivationPath{
+		Purpose:      44,
+		CoinType:     118,
+		Account:      0,
+		Change:       0,
+		AddressIndex: 0,
+	})
+	notErr(err)
+
 	ah := apps.NewHandler()
-	ah.Register(&cosmos.Cosmos{})
+	ah.Register(&cosmos.Cosmos{
+		Token: t,
+	})
 
 	ha := hidHandler{
 		ah: ah,
 	}
+
 	// rx
 	go func() {
 		for {
