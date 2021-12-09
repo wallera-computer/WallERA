@@ -1,0 +1,8 @@
+#!/bin/bash
+[ -r /etc/lsb-release ] && . /etc/lsb-release
+echo "▄▄▌ ▐ ▄▌ ▄▄▄· ▄▄▌  ▄▄▌  ▄▄▄ .▄▄▄   ▄▄▄· "
+echo "██· █▌▐█▐█ ▀█ ██•  ██•  ▀▄.▀·▀▄ █·▐█ ▀█ "
+echo "██▪▐█▐▐▌▄█▀▀█ ██▪  ██▪  ▐▀▀▪▄▐▀▀▄ ▄█▀▀█ "
+echo "▐█▌██▐█▌▐█ ▪▐▌▐█▌▐▌▐█▌▐▌▐█▄▄▌▐█•█▌▐█ ▪▐▌"
+echo " ▀▀▀▀ ▀▪ ▀  ▀ .▀▀▀ .▀▀▀  ▀▀▀ .▀  ▀ ▀  ▀ "
+printf "[ os: %s kernel: %s ]" ${DISTRIB_DESCRIPTION:-Unknown} $(uname -r)

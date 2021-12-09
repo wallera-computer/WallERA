@@ -1,0 +1,87 @@
+{
+    "variables": {
+        "vm_name": "wallera-dev"
+      },
+    "sensitive-variables": [
+    ],  
+    "builders": [
+      {
+        "type": "virtualbox-iso",
+        "disk_size": "81920",
+        "guest_os_type": "Ubuntu_64",
+        "iso_url": "https://releases.ubuntu.com/20.04/ubuntu-20.04.3-live-server-amd64.iso",
+        "iso_checksum": "sha256:f8e3086f3cea0fb3fefb29937ab5ed9d19e767079633960ccb50e76153effc98",
+        "cpus": 8,
+        "memory": 16384,
+        "headless": "false",
+        "boot_command": [
+          "<esc><esc><esc>",
+          "<enter><wait>",
+          "/casper/vmlinuz ",
+          "root=/dev/sr0 ",
+          "initrd=/casper/initrd ",
+          "autoinstall ",
+          "ds=nocloud-net;s=http://{{ .HTTPIP }}:{{ .HTTPPort }}/",
+          "<enter>"
+         ],
+         "boot_wait": "5s",
+         "http_directory": "http",
+         "shutdown_command": "sudo /sbin/halt -p",
+         "ssh_username": "vagrant",
+         "ssh_password": "vagrant",
+         "ssh_port": 22,
+         "ssh_timeout": "10m0s"
+       },
+      {
+        "type": "vmware-iso",
+        "disk_size": "81920", 
+        "disk_type_id": 0, 
+        "guest_os_type": "ubuntu64Guest",
+        "vm_name": "{{ user `vm_name` }}",
+        "iso_url": "https://releases.ubuntu.com/20.04/ubuntu-20.04.3-live-server-amd64.iso",
+        "iso_checksum": "sha256:f8e3086f3cea0fb3fefb29937ab5ed9d19e767079633960ccb50e76153effc98",
+        "cpus": 8,
+        "memory": 16384,
+        "headless": "false",
+        "boot_command": [
+         "<esc><esc><esc>",
+         "<enter><wait>",
+         "/casper/vmlinuz ",
+         "root=/dev/sr0 ",
+         "initrd=/casper/initrd ",
+         "autoinstall ",
+         "ds=nocloud-net;s=http://{{ .HTTPIP }}:{{ .HTTPPort }}/",
+         "<enter>"
+        ],
+        "boot_wait": "5s",
+        "http_directory": "http",
+        "shutdown_command": "sudo /sbin/halt -p",
+        "ssh_username": "vagrant",
+        "ssh_password": "vagrant",
+        "ssh_port": 22,
+        "ssh_timeout": "10m0s"
+      }
+    ],
+    "provisioners": [
+        {
+          "type": "file",
+          "source": "custom/motd",
+          "destination": "/tmp/motd"
+        },
+        {
+          "type": "shell",
+          "execute_command": "echo 'packer' | sudo -S sh -c '{{ .Vars }} {{ .Path }}'",
+          "scripts": [
+              "./wallera-prereqs.sh",
+              "./curtin-clean.sh",
+              "./vmware-allow-customize.sh"
+          ]
+        }
+      ],
+    "post-processors": [
+      {
+        "type": "vagrant",
+        "keep_input_artifact": false
+      }
+    ]
+  }

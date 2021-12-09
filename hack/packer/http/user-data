@@ -1,0 +1,106 @@
+#cloud-config
+autoinstall:
+  version: 1
+  early-commands:
+   - systemctl stop ssh # packer tries to connect to the ubuntu installer ssh session
+  locale: en_US.UTF-8
+  keyboard:
+    layout: us
+  identity:
+    hostname: wallera-dev
+    # For password crypt, use: mkpasswd -m sha-512
+    password: '$6$1rGYAAkd3QokRq7J$3QXT8qJfsM3WKjF5kIEArPRvIM59YQz2XkQ37aJoAsSiIuCxvk6vlFFNjzfR4Z1j1XxcNzoXORyr9hgriyej01'
+    username: vagrant
+  apt:
+    preserve_sources_list: false
+    primary:
+        - arches: [i386, amd64]
+          uri: "http://archive.ubuntu.com/ubuntu"
+        - arches: [default]
+          uri: "http://ports.ubuntu.com/ubuntu-ports"
+    geoip: true
+    package_upgrade: true
+    package_update: true
+    sources_list: |
+      deb $PRIMARY $RELEASE main restricted universe multiverse
+      deb $PRIMARY $RELEASE-updates main restricted universe multiverse
+      deb $PRIMARY $RELEASE-security main restricted universe multiverse
+      deb $PRIMARY $RELEASE-backports main restricted universe multiverse
+  storage:
+    version: 1
+    layout:
+      name: direct
+    grub:
+      install_devices:
+        - disk0-boot
+    swap:
+      size: 0
+    config:
+      # goals: ESP + boot + root
+      - id: disk0 # select raw disk (block device, like sda)
+        type: disk
+        match:
+          size: largest # select highest-capacity block device
+        ptable: gpt
+        wipe: superblock
+      - id: disk0-esp # create partitions on disk (like sda1)
+        type: partition
+        device: disk0
+        size: 512MB
+        flag: boot # EFI system partition needs boot flag
+      - id: disk0-boot
+        type: partition
+        device: disk0
+        size: 512MB
+      - id: disk0-root
+        type: partition
+        device: disk0
+        size: -1 # use the rest of the disk
+      - id: disk0-esp-fs # format partitions on disk
+        type: format
+        volume: disk0-esp
+        fstype: fat32
+        label: ESP
+      - id: disk0-boot-fs
+        type: format
+        volume: disk0-boot
+        fstype: ext4
+        label: BOOT
+      - id: disk0-root-fs
+        type: format
+        volume: disk0-root
+        fstype: xfs
+        label: ROOT
+      - id: disk0-esp-mount # mount partitions
+        type: mount
+        device: disk0-esp-fs
+        path: /boot/efi
+      - id: disk0-boot-mount
+        type: mount
+        device: disk0-boot-fs
+        path: "/boot"
+      - id: disk0-root-mount
+        type: mount
+        device: disk0-root-fs
+        path: "/"
+  network:
+    network:
+      version: 2
+      ethernets:
+        ens33:
+          dhcp4: yes
+          dhcp-identifier: mac
+  late-commands:
+    # allow vagrant user to sudo with no pwd
+    - "echo 'vagrant ALL=(ALL) NOPASSWD:ALL' > /target/etc/sudoers.d/vagrant"
+    - "chmod 440 /target/etc/sudoers.d/vagrant"
+    # use mac for dhcp client identifier - stops different ip being allocated after each reboot
+    - sed -i 's/^#*\(send dhcp-client-identifier\).*$/\1 = hardware;/' /target/etc/dhcp/dhclient.conf
+  packages:
+   - open-vm-tools
+   - virtualbox-guest-dkms
+  ssh:
+    authorized-keys: 
+      - "ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEA6NF8iallvQVp22WDkTkyrtvp9eWW6A8YVr+kz4TjGYe7gHzIw+niNltGEFHzD8+v1I2YJ6oXevct1YeS0o9HZyN1Q9qgCgzUFtdOKLv6IedplqoPkcmF0aYet2PkEDo3MlTBckFXPITAMzF8dJSIFo9D8HfdOV0IAdx4O7PtixWKn5y2hMNG0zQPyUecp4pzC6kivAIhyfHilFR61RGL+GPXQ2MWZWFYbAGjyiYJnAmCP3NOTd0jMZEnDkbUvxhMmBYSdETk1rRgm+R4LOzFUGaHqHDLKLX+FIPKcF96hrucXzcWyLbIbEgE98OHlnVYCzRdK8jlqm8tehUc9c9WhQ== vagrant insecure public key"
+    install-server: true
+    allow-pw: true
