@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/hex"
 	"errors"
 	"flag"
 	"log"
@@ -199,10 +198,6 @@ func (h *hidHandler) Rx(input []byte) ([]byte, error) {
 	}
 
 	return nil, nil
-}
-
-func h(in []byte) string {
-	return hex.EncodeToString(in)
 }
 
 // since we're in a critical configuration phase, panic on error.
