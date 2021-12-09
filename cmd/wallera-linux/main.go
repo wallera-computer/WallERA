@@ -16,13 +16,23 @@ import (
 	"github.com/wallera-computer/wallera/usb"
 )
 
-func cliArgs() (hidg, configfsPath string, mustClean bool) {
-	flag.StringVar(&hidg, "hidg", "/dev/hidg0", "/dev/hidgX file descriptor path")
-	flag.StringVar(&configfsPath, "configfs-path", "/sys/kernel/config", "configfs path")
-	flag.BoolVar(&mustClean, "clean", false, "clean existing hidg descriptors and exit")
+type args struct {
+	hidg          string
+	configfsPath  string
+	mustClean     bool
+	mustSetupHidg bool
+}
+
+func cliArgs() args {
+	a := args{}
+
+	flag.StringVar(&a.hidg, "hidg", "/dev/hidg0", "/dev/hidgX file descriptor path")
+	flag.StringVar(&a.configfsPath, "configfs-path", "/sys/kernel/config", "configfs path")
+	flag.BoolVar(&a.mustClean, "clean", false, "clean existing hidg descriptors and exit")
+	flag.BoolVar(&a.mustSetupHidg, "setup", false, "sets up dummy_hcd device and exits")
 	flag.Parse()
 
-	return
+	return a
 }
 
 func hidgExists(path string) bool {
@@ -31,29 +41,36 @@ func hidgExists(path string) bool {
 }
 
 func main() {
-	hidg, configfsPath, mustClean := cliArgs()
+	a := cliArgs()
 
-	if mustClean {
-		if err := cleanupHidg(configfsPath); err != nil {
+	if a.mustClean {
+		if err := cleanupHidg(a.configfsPath); err != nil {
 			panic(err)
 		}
 
 		return
 	}
 
-	if !hidgExists(hidg) {
+	shouldSetupHidg := !hidgExists(a.hidg) || a.mustClean
+
+	if shouldSetupHidg {
 		log.Println("configuring hidg")
-		if err := configureHidg(configfsPath); err != nil {
+		if err := configureHidg(a.configfsPath); err != nil {
 			panic(err)
 		}
 	} else {
 		log.Println("hidg already configured, using pre-existing one")
 	}
 
+	if a.mustSetupHidg {
+		// we exit here
+		return
+	}
+
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 
-	hidRx, err := os.OpenFile(hidg, os.O_RDWR, 0666)
+	hidRx, err := os.OpenFile(a.hidg, os.O_RDWR, 0666)
 	notErr(err)
 
 	log.Println("done, polling...")
