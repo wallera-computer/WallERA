@@ -6,6 +6,7 @@ Vagrant.configure("2") do |config|
   config.vm.provider "vmware_desktop" do |vm|
     vm.vmx["memsize"] = "8192"
     vm.vmx["numvcpus"] = "4"
+    vm.vmx["ethernet0.pcislotnumber"] = "160"
   end
   config.vm.provider "virtualbox" do |vb|
     vb.memory = 1024

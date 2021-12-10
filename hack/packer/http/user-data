@@ -13,19 +13,9 @@ autoinstall:
     username: vagrant
   apt:
     preserve_sources_list: false
-    primary:
-        - arches: [i386, amd64]
-          uri: "http://archive.ubuntu.com/ubuntu"
-        - arches: [default]
-          uri: "http://ports.ubuntu.com/ubuntu-ports"
     geoip: true
-    package_upgrade: true
+    package_upgrade: false
     package_update: true
-    sources_list: |
-      deb $PRIMARY $RELEASE main restricted universe multiverse
-      deb $PRIMARY $RELEASE-updates main restricted universe multiverse
-      deb $PRIMARY $RELEASE-security main restricted universe multiverse
-      deb $PRIMARY $RELEASE-backports main restricted universe multiverse
   storage:
     version: 1
     layout:
@@ -87,7 +77,7 @@ autoinstall:
     network:
       version: 2
       ethernets:
-        ens33:
+        ens160:
           dhcp4: yes
           dhcp-identifier: mac
   late-commands:
@@ -96,9 +86,6 @@ autoinstall:
     - "chmod 440 /target/etc/sudoers.d/vagrant"
     # use mac for dhcp client identifier - stops different ip being allocated after each reboot
     - sed -i 's/^#*\(send dhcp-client-identifier\).*$/\1 = hardware;/' /target/etc/dhcp/dhclient.conf
-  packages:
-   - open-vm-tools
-   - virtualbox-guest-dkms
   ssh:
     authorized-keys: 
       - "ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEA6NF8iallvQVp22WDkTkyrtvp9eWW6A8YVr+kz4TjGYe7gHzIw+niNltGEFHzD8+v1I2YJ6oXevct1YeS0o9HZyN1Q9qgCgzUFtdOKLv6IedplqoPkcmF0aYet2PkEDo3MlTBckFXPITAMzF8dJSIFo9D8HfdOV0IAdx4O7PtixWKn5y2hMNG0zQPyUecp4pzC6kivAIhyfHilFR61RGL+GPXQ2MWZWFYbAGjyiYJnAmCP3NOTd0jMZEnDkbUvxhMmBYSdETk1rRgm+R4LOzFUGaHqHDLKLX+FIPKcF96hrucXzcWyLbIbEgE98OHlnVYCzRdK8jlqm8tehUc9c9WhQ== vagrant insecure public key"

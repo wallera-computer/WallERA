@@ -1,0 +1,98 @@
+{
+    "builders": [
+        {
+            "boot_command": [
+                "<esc><esc><esc>",
+                "<enter><wait>",
+                "linux ",
+                "/casper/vmlinuz ",
+                "initrd=/casper/initrd ",
+                "autoinstall ",
+                "ds=nocloud-net;s=http://{{ .HTTPIP }}:{{ .HTTPPort }}/",
+                "<enter><wait>",
+                "boot",
+                "<enter>"
+            ],
+            "boot_wait": "5s",
+            "cpus": 4,
+            "disk_size": "81920",
+            "guest_os_type": "Ubuntu_64",
+            "headless": "false",
+            "http_directory": "http",
+            "iso_checksum": "sha256:d6fea1f11b4d23b481a48198f51d9b08258a36f6024cb5cec447fe78379959ce",
+            "iso_url": "https://cdimage.ubuntu.com/releases/20.04/release/ubuntu-20.04.3-live-server-arm64.iso",
+            "memory": 4096,
+            "shutdown_command": "sudo /sbin/halt -p",
+            "ssh_password": "vagrant",
+            "ssh_port": 22,
+            "ssh_timeout": "10m0s",
+            "ssh_username": "vagrant",
+            "type": "virtualbox-iso"
+        },
+        {
+            "boot_command": [
+                "<esc><esc><esc>",
+                "<enter><wait>",
+                "linux ",
+                "/casper/vmlinuz --- ",
+                "autoinstall ",
+                "ds=nocloud-net\\;s=http://{{ .HTTPIP }}:{{ .HTTPPort }}/",
+                "<enter><wait>",
+                "initrd /casper/initrd ",
+		"<enter><wait>",
+                "boot",
+                "<enter>"
+            ],
+            "boot_wait": "5s",
+            "cpus": 4,
+            "disk_adapter_type": "nvme",
+            "disk_size": "81920",
+            "disk_type_id": 0,
+            "guest_os_type": "arm-debian11-64",
+            "headless": "false",
+            "http_directory": "http",
+            "iso_checksum": "sha256:d6fea1f11b4d23b481a48198f51d9b08258a36f6024cb5cec447fe78379959ce",
+            "iso_url": "https://cdimage.ubuntu.com/releases/20.04/release/ubuntu-20.04.3-live-server-arm64.iso",
+            "memory": 4096,
+            "network_adapter_type": "e1000e",
+            "shutdown_command": "sudo /sbin/halt -p",
+            "ssh_password": "vagrant",
+            "ssh_port": 22,
+            "ssh_timeout": "10m0s",
+            "ssh_username": "vagrant",
+            "type": "vmware-iso",
+            "usb": "true",
+            "version": "19",
+            "vmx_data": {
+                "architecture": "arm64",
+                "usb_xhci.present": "true"
+            }
+        }
+    ],
+    "post-processors": [
+        {
+            "keep_input_artifact": false,
+            "type": "vagrant"
+        }
+    ],
+    "provisioners": [
+        {
+            "destination": "/tmp/motd",
+            "source": "custom/motd",
+            "type": "file"
+        },
+        {
+            "execute_command": "echo 'packer' | sudo -S sh -c '{{ .Vars }} {{ .Path }}'",
+            "scripts": [
+                "./wallera-prereqs.sh",
+                "./curtin-clean.sh",
+                "./vmware-allow-customize.sh"
+            ],
+            "type": "shell"
+        }
+    ],
+    "sensitive-variables": [],
+    "variables": {
+        "vm_name": "wallera-dev"
+    }
+}
