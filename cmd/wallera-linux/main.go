@@ -6,13 +6,11 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"sync"
 	"syscall"
 	"time"
 
 	"github.com/wallera-computer/wallera/apps"
 	"github.com/wallera-computer/wallera/apps/cosmos"
-	"github.com/wallera-computer/wallera/crypto"
 	"github.com/wallera-computer/wallera/usb"
 )
 
@@ -78,15 +76,7 @@ func main() {
 	// add 50ms delay in both rx and tx
 	// we don't wanna burn laptop cpus :^)
 
-	t := &dumbToken{}
-	err = t.Initialize(crypto.DerivationPath{
-		Purpose:      44,
-		CoinType:     118,
-		Account:      0,
-		Change:       0,
-		AddressIndex: 0,
-	})
-	notErr(err)
+	t := NewDumbToken()
 
 	ah := apps.NewHandler()
 	ah.Register(&cosmos.Cosmos{
@@ -94,7 +84,8 @@ func main() {
 	})
 
 	ha := hidHandler{
-		ah: ah,
+		ah:           ah,
+		outboundChan: make(chan [][]byte),
 	}
 
 	// rx
@@ -144,33 +135,20 @@ func main() {
 type hidHandler struct {
 	ah *apps.Handler
 
-	outboundMutex  sync.Mutex
-	outboundBuffer [][]byte
-	session        *usb.Session
+	outboundChan chan [][]byte
+	session      *usb.Session
 }
 
+// writeOutbound will block until h.outboundChan gets read on the other
+// side.
 func (h *hidHandler) writeOutbound(data [][]byte) {
-	h.outboundMutex.Lock()
-	defer h.outboundMutex.Unlock()
-
-	h.outboundBuffer = data
+	h.outboundChan <- data
 }
 
+// readOutbound will block until h.outboundChan gets written on the other
+// side.
 func (h *hidHandler) readOutbound() [][]byte {
-	h.outboundMutex.Lock()
-	defer h.outboundMutex.Unlock()
-
-	m := make([][]byte, len(h.outboundBuffer))
-	copy(m, h.outboundBuffer)
-	if h.session != nil {
-		if !h.session.ShouldReadMore {
-			h.session = nil
-		}
-	}
-
-	h.outboundBuffer = make([][]byte, 0)
-
-	return m
+	return <-h.outboundChan
 }
 
 func (h *hidHandler) Tx() ([][]byte, error) {
@@ -209,6 +187,7 @@ func (h *hidHandler) Rx(input []byte) ([]byte, error) {
 
 	if chunks != nil {
 		h.writeOutbound(chunks)
+		h.session = nil
 	}
 
 	return nil, nil
