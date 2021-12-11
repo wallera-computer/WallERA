@@ -38,19 +38,23 @@ var (
 	commandErrWrongLength = [2]byte{0x67, 0x82}
 )
 
+// Cosmos handles Cosmos SDK commands.
 type Cosmos struct {
+	Token                   crypto.Token
 	currentSignatureSession *signatureSession
-	Token                   crypto.Token // TODO: find a way to make this stateless, private key can be just derived each time
 }
 
+// Name implements the apps.App interface
 func (c *Cosmos) Name() string {
 	return appName
 }
 
+// ID implements the apps.App interface
 func (c *Cosmos) ID() byte {
 	return appID
 }
 
+// Commands implements the apps.App interface
 func (c *Cosmos) Commands() (commandIDs []byte) {
 	ret := []byte{
 		byte(claGetVersion),
@@ -61,6 +65,7 @@ func (c *Cosmos) Commands() (commandIDs []byte) {
 	return ret
 }
 
+// Handle implements the apps.App interface
 func (c *Cosmos) Handle(cmd byte, data []byte) (response []byte, code [2]byte, err error) {
 	log.Println("handling command", command(cmd).String())
 	switch cmd {
@@ -255,11 +260,13 @@ func (c *Cosmos) handleGetAddrSecp256K1(data []byte) (response []byte, code [2]b
 	dp := derivationPathFromGetAddressRequest(req, data)
 	log.Println("derivation path:", dp.String())
 
-	if err := c.Token.Initialize(dp); err != nil {
+	sessionToken := c.Token.Clone()
+
+	if err := sessionToken.Initialize(dp); err != nil {
 		return nil, commandErrWrongLength, err
 	}
 
-	pubkey, err := c.Token.PublicKey()
+	pubkey, err := sessionToken.PublicKey()
 	if err != nil {
 		return nil, commandErrWrongLength, err
 	}
