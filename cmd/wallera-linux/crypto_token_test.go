@@ -10,7 +10,11 @@ import (
 
 const (
 	standardSecret = "10cbc65c342e07b730ffb0f48fe2c41e9776363c73ade5e699c4cccb1257188d"
-	standardPubkey = "03c04b40d19f65ff09f60beba0f38b711ef21e12e18b88fadced3fb285d1431bea"
+	standardPubkey = "029ac8e45aa5c4bf453980d6f5fce78f6b7f55b42add2e7700709320ac8da8bb9e"
+)
+
+var (
+	standardMnemonic = []string{"awkward", "funny", "novel", "hair", "there", "swear", "sentence", "voyage", "virus", "lecture", "rain", "diamond", "jazz", "brand", "vault", "interest", "tourist", "crumble", "illness", "office", "raise", "clog", "giraffe", "pencil"}
 )
 
 func secretBytes(t *testing.T) [32]byte {
@@ -27,6 +31,23 @@ func pubKeyBytes(t *testing.T) []byte {
 	h, err := hex.DecodeString(standardPubkey)
 	require.NoError(t, err)
 	return h
+}
+
+func Test_dumbToken_MnemonicReturnsAFullSlice(t *testing.T) {
+	dt := &dumbToken{}
+	require.NoError(t, dt.Initialize(crypto.DerivationPath{
+		Purpose:      44,
+		CoinType:     118,
+		Account:      0,
+		Change:       0,
+		AddressIndex: 0,
+	}))
+
+	m, err := dt.Mnemonic()
+
+	require.NoError(t, err)
+	require.NotEmpty(t, m)
+	require.Equal(t, standardMnemonic, m)
 }
 
 func Test_dumbToken_DeriveSecretReturnsExpectedSecret(t *testing.T) {
