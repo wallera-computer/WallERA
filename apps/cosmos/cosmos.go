@@ -254,9 +254,6 @@ func (c *Cosmos) handleGetAddrSecp256K1(data []byte) (response []byte, code [2]b
 	hrp := hrpFromGetAddressRequest(req, data)
 	log.Println("requested hrp:", string(hrp))
 
-	// TODO: we're generating a random address + pubkey on each call for demo purposes
-	// please someone build a better design, thanks!
-
 	dp := derivationPathFromGetAddressRequest(req, data)
 	log.Println("derivation path:", dp.String())
 
