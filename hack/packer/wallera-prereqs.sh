@@ -41,7 +41,7 @@ cp /boot/config-$(uname -r)* .config
 sed -i "s/^CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION=\"-wallera\"/" .config
 echo "CONFIG_USB_DUMMY_HCD=m" >> .config
 yes '' | make oldconfig
-make -j16 bindeb-pkg
+make -j8 bindeb-pkg
 cd .. || exit
 dpkg -i linux-*.deb
 update-grub

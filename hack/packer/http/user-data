@@ -77,7 +77,7 @@ autoinstall:
     network:
       version: 2
       ethernets:
-        ens160:
+        enp0s3:
           dhcp4: yes
           dhcp-identifier: mac
   late-commands:
