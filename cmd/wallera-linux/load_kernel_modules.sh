@@ -13,5 +13,3 @@ for i in ${MODULES[@]}; do
     echo loading $i
     modprobe $i
 done
-
-chown $1 /dev/hidg0

@@ -73,8 +73,9 @@ wallera-linux:
 
 setup-wallera-linux: wallera-linux
 	@echo "You will be prompted for your root password, because we have to load some kernel modules and setup permissions"
+	sudo bash cmd/wallera-linux/load_kernel_modules.sh
 	sudo ./wallera-linux -setup
-	sudo bash cmd/wallera-linux/load_kernel_modules.sh $$USER
+	sudo chown $$USER /dev/hidg0
 
 #### dependencies ####
 $(APP): check_tamago
