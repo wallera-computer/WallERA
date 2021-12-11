@@ -32,6 +32,12 @@ type dumbToken struct {
 	privKey *hdkeychain.ExtendedKey
 }
 
+// NewDumbToken returns a new instance of dumbToken.
+// Callers should Clone() this instance and then call Initialize().
+func NewDumbToken() crypto.Token {
+	return &dumbToken{}
+}
+
 func (dt *dumbToken) RandomBytes(amount uint64) ([]byte, error) {
 	if amount == 0 {
 		return nil, fmt.Errorf("requested bytes amount is zero")
