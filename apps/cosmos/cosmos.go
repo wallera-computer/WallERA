@@ -5,10 +5,11 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
-	"log"
 
 	"github.com/cosmos/btcutil/bech32"
 	"github.com/wallera-computer/wallera/crypto"
+	"github.com/wallera-computer/wallera/log"
+	"go.uber.org/zap"
 	"golang.org/x/crypto/ripemd160"
 )
 
@@ -42,6 +43,18 @@ var (
 type Cosmos struct {
 	Token                   crypto.Token
 	currentSignatureSession *signatureSession
+
+	l *zap.SugaredLogger
+}
+
+func (c *Cosmos) initLog() {
+	if c.l != nil {
+		return
+	}
+
+	c.l = log.Development(
+		zap.Fields(zap.String("app_name", c.Name())),
+	).Sugar()
 }
 
 // Name implements the apps.App interface
@@ -67,7 +80,9 @@ func (c *Cosmos) Commands() (commandIDs []byte) {
 
 // Handle implements the apps.App interface
 func (c *Cosmos) Handle(cmd byte, data []byte) (response []byte, code [2]byte, err error) {
-	log.Println("handling command", command(cmd).String())
+	c.initLog()
+
+	c.l.Debugw("handling command", "name", command(cmd).String())
 	switch cmd {
 	case byte(claGetVersion):
 		return c.handleGetVersion()
@@ -121,7 +136,7 @@ type signatureSession struct {
 
 func (c *Cosmos) handleSignSecp256K1(data []byte) (response []byte, code [2]byte, err error) {
 	payloadDescription := signPayloadDescr(data[2])
-	log.Println("sign payload description:", payloadDescription.String())
+	c.l.Debugw("sign payload", "description", payloadDescription.String())
 
 	if c.currentSignatureSession == nil && payloadDescription != signInit {
 		return nil, commandErrEmptyBuffer, fmt.Errorf("wrong signature description with no session initialized, %v", payloadDescription.String())
@@ -144,14 +159,14 @@ func (c *Cosmos) handleSignSecp256K1(data []byte) (response []byte, code [2]byte
 			data[16:20],
 		)
 
-		log.Println("read derivation path in sign init:", c.currentSignatureSession.derivationPath.String())
+		c.l.Debugw("read derivation path in sign init", "derivation path", c.currentSignatureSession.derivationPath.String())
 	case signAdd, signLast:
-		log.Println("writing data to sigsession:", len(data))
+		c.l.Debugw("writing data to session", "length", len(data))
 		c.currentSignatureSession.data.Write(data)
 	}
 
 	if payloadDescription != signLast {
-		log.Println("not continuing with signature since we're not in signLast")
+		c.l.Debugw("not continuing with signature since we're not in signLast")
 		return nil, commandCodeOK, nil
 	}
 
@@ -169,9 +184,7 @@ func (c *Cosmos) handleSignSecp256K1(data []byte) (response []byte, code [2]byte
 	// len(sigBytes) will be always 10 bytes less than the session data as a whole,
 	// because we're trimming the APDU header for signAdd and signLast.
 	sigBytes := c.currentSignatureSession.data.Bytes()
-	log.Println("complete signature payload:", sigBytes)
-	log.Println("sigBytes len:", len(sigBytes))
-	log.Println("sigBytes str:", string(sigBytes))
+	c.l.Debugw("complete signature payload", "payload", sigBytes, "length", len(sigBytes), "string representation", string(sigBytes))
 
 	sbHash := sha256.Sum256(sigBytes)
 	resp, err := sessionToken.Sign(sbHash[:], crypto.AlgoSecp256K1)
@@ -179,7 +192,7 @@ func (c *Cosmos) handleSignSecp256K1(data []byte) (response []byte, code [2]byte
 		return nil, commandErrWrongLength, err
 	}
 
-	log.Println("length signature:", len(resp))
+	c.l.Debugw("signature length", "length", len(resp))
 	return resp, commandCodeOK, nil
 }
 
@@ -249,13 +262,13 @@ func (c *Cosmos) handleGetAddrSecp256K1(data []byte) (response []byte, code [2]b
 		return nil, commandErrWrongLength, err
 	}
 
-	log.Println("display on device:", displayAddrOnDevice(req))
+	c.l.Debugw("should display on device", "value", displayAddrOnDevice(req))
 
 	hrp := hrpFromGetAddressRequest(req, data)
-	log.Println("requested hrp:", string(hrp))
+	c.l.Debugw("request hrp", "value", string(hrp))
 
 	dp := derivationPathFromGetAddressRequest(req, data)
-	log.Println("derivation path:", dp.String())
+	c.l.Debugw("derivation path", "value", dp.String())
 
 	sessionToken := c.Token.Clone()
 
@@ -273,7 +286,7 @@ func (c *Cosmos) handleGetAddrSecp256K1(data []byte) (response []byte, code [2]b
 		return nil, commandErrWrongLength, err
 	}
 
-	log.Println("generated address:", address)
+	c.l.Debugw("address generation complete", "address", address)
 
 	// TODO: handle derivation path
 	return buildGetAddressResponse(
