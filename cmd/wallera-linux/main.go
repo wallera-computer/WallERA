@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"flag"
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -11,7 +10,9 @@ import (
 
 	"github.com/wallera-computer/wallera/apps"
 	"github.com/wallera-computer/wallera/apps/cosmos"
+	"github.com/wallera-computer/wallera/log"
 	"github.com/wallera-computer/wallera/usb"
+	"go.uber.org/zap"
 )
 
 type args struct {
@@ -40,10 +41,11 @@ func hidgExists(path string) bool {
 
 func main() {
 	a := cliArgs()
+	l := log.Development().Sugar()
 
 	if a.mustClean {
 		if err := cleanupHidg(a.configfsPath); err != nil {
-			panic(err)
+			l.Panic(err)
 		}
 
 		return
@@ -52,12 +54,12 @@ func main() {
 	shouldSetupHidg := !hidgExists(a.hidg) || a.mustClean
 
 	if shouldSetupHidg {
-		log.Println("configuring hidg")
+		l.Info("configuring hidg")
 		if err := configureHidg(a.configfsPath); err != nil {
-			panic(err)
+			l.Panic(err)
 		}
 	} else {
-		log.Println("hidg already configured, using pre-existing one")
+		l.Info("hidg already configured, using pre-existing one")
 	}
 
 	if a.mustSetupHidg {
@@ -69,9 +71,9 @@ func main() {
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 
 	hidRx, err := os.OpenFile(a.hidg, os.O_RDWR, 0666)
-	notErr(err)
+	notErr(err, l)
 
-	log.Println("done, polling...")
+	l.Info("done, polling...")
 
 	// add 50ms delay in both rx and tx
 	// we don't wanna burn laptop cpus :^)
@@ -94,11 +96,11 @@ func main() {
 			time.Sleep(50 * time.Millisecond)
 			buf := make([]byte, 64)
 			_, err := hidRx.Read(buf)
-			notErr(err)
+			notErr(err, l)
 
-			_, err = ha.Rx(buf)
+			_, err = ha.Rx(buf, l)
 			if err != nil {
-				log.Println("rx error:", err)
+				l.Error("rx error: ", err)
 				continue
 			}
 		}
@@ -109,7 +111,7 @@ func main() {
 			time.Sleep(50 * time.Millisecond)
 			data, err := ha.Tx()
 			if err != nil {
-				log.Println("tx error:", err)
+				l.Error("tx error: ", err)
 				continue
 			}
 
@@ -117,19 +119,19 @@ func main() {
 				continue
 			}
 
-			for _, chunk := range data {
+			for i, chunk := range data {
 				_, err = hidRx.Write(chunk)
-				notErr(err)
-				log.Println("written chunk", chunk)
+				notErr(err, l)
+				l.Infow("written chunk", "index", i, "chunk", chunk)
 			}
 		}
 	}()
 
-	log.Println("running...")
+	l.Info("running...")
 
 	<-sigs
 
-	log.Println("exiting, call this binary with the '-clean' flag to clean hidg entries")
+	l.Info("exiting, call this binary with the '-clean' flag to clean hidg entries")
 }
 
 type hidHandler struct {
@@ -155,33 +157,27 @@ func (h *hidHandler) Tx() ([][]byte, error) {
 	return h.readOutbound(), nil
 }
 
-func (h *hidHandler) Rx(input []byte) ([]byte, error) {
-	log.Println("input bytes:", input, "length:", len(input))
+func (h *hidHandler) Rx(input []byte, l *zap.SugaredLogger) ([]byte, error) {
+	l.Debugw("handling rx", "input bytes", input, "length", len(input))
 
 	if h.session == nil {
 		s, err := usb.NewSession(input)
-		if err != nil {
-			log.Fatal(err)
-		}
+		notErr(err, l)
 		h.session = &s
 	} else {
 		err := h.session.ReadData(input)
-		if err != nil {
-			log.Fatal(err)
-		}
+		notErr(err, l)
 	}
 
-	log.Printf("session: %+v\n", h.session)
+	l.Debugw("handling session", "data", h.session)
 
 	if h.session.ShouldReadMore {
-		log.Println("should still read more data, continuing")
+		l.Debug("should still read more data, continuing")
 		return nil, nil
 	}
 
 	resp, err := h.ah.Handle(h.session.Data())
-	if err != nil {
-		log.Fatal(err)
-	}
+	notErr(err, l)
 
 	chunks := h.session.FormatResponse(resp)
 
@@ -194,8 +190,8 @@ func (h *hidHandler) Rx(input []byte) ([]byte, error) {
 }
 
 // since we're in a critical configuration phase, panic on error.
-func notErr(e error) {
+func notErr(e error, l *zap.SugaredLogger) {
 	if e != nil {
-		panic(e)
+		l.Panic(e)
 	}
 }
