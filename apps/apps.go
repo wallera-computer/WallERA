@@ -103,12 +103,12 @@ func (h *Handler) Handle(data []byte) ([]byte, error) {
 	command := capdu.INS
 
 	if !h.mappingExists(appID) {
-		return packageResponse(nil, APDUCLANotSupported),
+		return PackageResponse(nil, APDUCLANotSupported),
 			fmt.Errorf("appID %v not supported", appID)
 	}
 
 	if !h.commandAppMappingExists(appID, command) {
-		return packageResponse(nil, APDUCLANotSupported),
+		return PackageResponse(nil, APDUCLANotSupported),
 			fmt.Errorf("command ID %v not supported in app %v", command, appID)
 	}
 
@@ -116,10 +116,10 @@ func (h *Handler) Handle(data []byte) ([]byte, error) {
 
 	respData, respCode, err := app.Handle(command, data)
 
-	return packageResponse(respData, respCode), err
+	return PackageResponse(respData, respCode), err
 }
 
-func packageResponse(data []byte, code APDUCode) []byte {
+func PackageResponse(data []byte, code APDUCode) []byte {
 	buffer := &bytes.Buffer{}
 
 	write := func(dest io.Writer, data interface{}) {
