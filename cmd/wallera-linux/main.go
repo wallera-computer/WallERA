@@ -177,7 +177,14 @@ func (h *hidHandler) Rx(input []byte, l *zap.SugaredLogger) ([]byte, error) {
 	}
 
 	resp, err := h.ah.Handle(h.session.Data())
-	notErr(err, l)
+	if err != nil {
+		l.Errorw("cannot handle session data", "error", err)
+	}
+
+	if resp == nil {
+		h.session = nil
+		return nil, nil
+	}
 
 	chunks := h.session.FormatResponse(resp)
 
