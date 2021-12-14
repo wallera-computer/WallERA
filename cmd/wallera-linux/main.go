@@ -161,12 +161,18 @@ func (h *hidHandler) Rx(input []byte, l *zap.SugaredLogger) ([]byte, error) {
 	l.Debugw("handling rx", "input bytes", input, "length", len(input))
 
 	if h.session == nil {
-		s, err := usb.NewSession(input)
+		s, err := usb.NewSession(input, l)
 		notErr(err, l)
 		h.session = &s
 	} else {
 		err := h.session.ReadData(input)
-		notErr(err, l)
+		l.Errorw("cannot read input data", "error", err)
+		h.writeOutbound(
+			h.session.FormatResponse(
+				apps.PackageResponse(nil, apps.APDUCommandNotAllowed),
+			),
+		)
+		return nil, nil
 	}
 
 	l.Debugw("handling session", "data", h.session)
