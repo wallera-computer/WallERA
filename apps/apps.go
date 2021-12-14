@@ -1,7 +1,10 @@
 package apps
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
+	"io"
 
 	"github.com/hsanjuan/go-nfctype4/apdu"
 )
@@ -16,7 +19,7 @@ type App interface {
 	Name() string
 	ID() byte
 	Commands() (commandIDs []byte)
-	Handle(command byte, data []byte) (response []byte, code [2]byte, err error)
+	Handle(command byte, data []byte) (response []byte, code APDUCode, err error)
 }
 
 type commandMapping struct {
@@ -100,15 +103,13 @@ func (h *Handler) Handle(data []byte) ([]byte, error) {
 	command := capdu.INS
 
 	if !h.mappingExists(appID) {
-		// TODO: no app has been registered for this appID, return
-		// appropriate error
-		return nil, fmt.Errorf("appID %v not supported", appID)
+		return packageResponse(nil, APDUCLANotSupported),
+			fmt.Errorf("appID %v not supported", appID)
 	}
 
 	if !h.commandAppMappingExists(appID, command) {
-		// TODO: no command with the given command ID and app ID has been
-		// registered, regur appropriate error
-		return nil, fmt.Errorf("command ID %v not supported in app %v", command, appID)
+		return packageResponse(nil, APDUCLANotSupported),
+			fmt.Errorf("command ID %v not supported in app %v", command, appID)
 	}
 
 	app := h.appMap[appID]
@@ -118,15 +119,17 @@ func (h *Handler) Handle(data []byte) ([]byte, error) {
 	return packageResponse(respData, respCode), err
 }
 
-func packageResponse(data []byte, code [2]byte) []byte {
-	pkt := apdu.RAPDU{
-		ResponseBody: data,
-		SW1:          code[0],
-		SW2:          code[1],
+func packageResponse(data []byte, code APDUCode) []byte {
+	buffer := &bytes.Buffer{}
+
+	write := func(dest io.Writer, data interface{}) {
+		if err := binary.Write(dest, binary.BigEndian, data); err != nil {
+			panic(fmt.Sprintf("cannot package response, %s", err.Error()))
+		}
 	}
 
-	// Marshal never errors.
-	resp, _ := pkt.Marshal()
+	write(buffer, data)
+	write(buffer, code)
 
-	return resp
+	return buffer.Bytes()
 }
