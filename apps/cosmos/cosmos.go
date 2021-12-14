@@ -4,12 +4,16 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 
 	"github.com/cosmos/btcutil/bech32"
+	"github.com/wallera-computer/wallera/apps"
 	"github.com/wallera-computer/wallera/crypto"
 	"github.com/wallera-computer/wallera/log"
 	"go.uber.org/zap"
+
+	//lint:ignore SA1019 RIPEMD160 is used for Cosmos addresses derivation
 	"golang.org/x/crypto/ripemd160"
 )
 
@@ -17,8 +21,11 @@ import (
 type command byte
 
 const (
-	appName                     = "COSMOS"
-	appID               byte    = 85
+	appName      = "COSMOS"
+	appID   byte = 85
+
+	minDataLen = 5
+
 	claGetVersion       command = 0x00
 	claSignSecp256K1    command = 0x02
 	claGetAddrSecp256K1 command = 0x04
@@ -33,17 +40,12 @@ const (
 	signLast signPayloadDescr = 2
 )
 
-var (
-	commandCodeOK         = [2]byte{0x90, 0x00}
-	commandErrEmptyBuffer = [2]byte{0x69, 0x82}
-	commandErrWrongLength = [2]byte{0x67, 0x82}
-)
-
 // Cosmos handles Cosmos SDK commands.
 type Cosmos struct {
 	Token                   crypto.Token
 	currentSignatureSession *signatureSession
 
+	// TODO: figure out how to better handle logger instance
 	l *zap.SugaredLogger
 }
 
@@ -79,8 +81,12 @@ func (c *Cosmos) Commands() (commandIDs []byte) {
 }
 
 // Handle implements the apps.App interface
-func (c *Cosmos) Handle(cmd byte, data []byte) (response []byte, code [2]byte, err error) {
+func (c *Cosmos) Handle(cmd byte, data []byte) (response []byte, code apps.APDUCode, err error) {
 	c.initLog()
+
+	if len(data) < minDataLen {
+		return nil, apps.APDUWrongLength, fmt.Errorf("data is too small to be processed")
+	}
 
 	c.l.Debugw("handling command", "name", command(cmd).String())
 	switch cmd {
@@ -91,8 +97,7 @@ func (c *Cosmos) Handle(cmd byte, data []byte) (response []byte, code [2]byte, e
 	case byte(claGetAddrSecp256K1):
 		return c.handleGetAddrSecp256K1(data)
 	default:
-		// TODO: handle this
-		return nil, [2]byte{}, fmt.Errorf("command not found")
+		return nil, apps.APDUINSNotSupported, fmt.Errorf("command not found")
 	}
 }
 
@@ -115,7 +120,7 @@ func (g getVersionResponse) Marshal() ([]byte, error) {
 	return ret.Bytes(), err
 }
 
-func (c *Cosmos) handleGetVersion() (response []byte, code [2]byte, err error) {
+func (c *Cosmos) handleGetVersion() (response []byte, code apps.APDUCode, err error) {
 	resp, err := getVersionResponse{
 		TestMode: 0,
 		Version: version{
@@ -126,7 +131,7 @@ func (c *Cosmos) handleGetVersion() (response []byte, code [2]byte, err error) {
 		DeviceLocked: 0,
 	}.Marshal()
 
-	return resp, commandCodeOK, err
+	return resp, apps.APDUSuccess, err
 }
 
 type signatureSession struct {
@@ -134,12 +139,14 @@ type signatureSession struct {
 	data           *bytes.Buffer
 }
 
-func (c *Cosmos) handleSignSecp256K1(data []byte) (response []byte, code [2]byte, err error) {
+func (c *Cosmos) handleSignSecp256K1(data []byte) (response []byte, code apps.APDUCode, err error) {
+	// TODO: check validity of signature payload
+	// https://github.com/LedgerHQ/app-cosmos/blob/master/docs/TXSPEC.md
 	payloadDescription := signPayloadDescr(data[2])
 	c.l.Debugw("sign payload", "description", payloadDescription.String())
 
 	if c.currentSignatureSession == nil && payloadDescription != signInit {
-		return nil, commandErrEmptyBuffer, fmt.Errorf("wrong signature description with no session initialized, %v", payloadDescription.String())
+		return nil, apps.APDUExecutionError, fmt.Errorf("wrong signature description with no session initialized, %v", payloadDescription.String())
 	}
 
 	if payloadDescription == signInit {
@@ -167,7 +174,7 @@ func (c *Cosmos) handleSignSecp256K1(data []byte) (response []byte, code [2]byte
 
 	if payloadDescription != signLast {
 		c.l.Debugw("not continuing with signature since we're not in signLast")
-		return nil, commandCodeOK, nil
+		return nil, apps.APDUSuccess, nil
 	}
 
 	defer func(c *Cosmos) {
@@ -178,7 +185,7 @@ func (c *Cosmos) handleSignSecp256K1(data []byte) (response []byte, code [2]byte
 	// might differ from the one we used to initialize the token before.
 	sessionToken := c.Token.Clone()
 	if err := sessionToken.Initialize(c.currentSignatureSession.derivationPath); err != nil {
-		return nil, commandErrEmptyBuffer, err
+		return nil, apps.APDUExecutionError, err
 	}
 
 	// len(sigBytes) will be always 10 bytes less than the session data as a whole,
@@ -186,14 +193,18 @@ func (c *Cosmos) handleSignSecp256K1(data []byte) (response []byte, code [2]byte
 	sigBytes := c.currentSignatureSession.data.Bytes()
 	c.l.Debugw("complete signature payload", "payload", sigBytes, "length", len(sigBytes), "string representation", string(sigBytes))
 
+	if err := json.Unmarshal(sigBytes, &json.RawMessage{}); err != nil {
+		return nil, apps.APDUDataInvalid, fmt.Errorf("provided signature data isn't JSON")
+	}
+
 	sbHash := sha256.Sum256(sigBytes)
 	resp, err := sessionToken.Sign(sbHash[:], crypto.AlgoSecp256K1)
 	if err != nil {
-		return nil, commandErrWrongLength, err
+		return nil, apps.APDUExecutionError, err
 	}
 
 	c.l.Debugw("signature length", "length", len(resp))
-	return resp, commandCodeOK, nil
+	return resp, apps.APDUSuccess, nil
 }
 
 func buildGetAddressResponse(pubkey []byte, address string) []byte {
@@ -252,14 +263,14 @@ func displayAddrOnDevice(r getAddressRequest) bool {
 	return r.P1 == 0x01
 }
 
-func (c *Cosmos) handleGetAddrSecp256K1(data []byte) (response []byte, code [2]byte, err error) {
+func (c *Cosmos) handleGetAddrSecp256K1(data []byte) (response []byte, code apps.APDUCode, err error) {
 	req := getAddressRequest{}
 	if err := binary.Read(bytes.NewReader(data), binary.BigEndian, &req); err != nil {
-		return nil, commandErrEmptyBuffer, err // TODO: correct error here
+		return nil, apps.APDUExecutionError, err // TODO: correct error here
 	}
 
 	if err := req.validate(); err != nil {
-		return nil, commandErrWrongLength, err
+		return nil, apps.APDUExecutionError, err
 	}
 
 	c.l.Debugw("should display on device", "value", displayAddrOnDevice(req))
@@ -273,26 +284,25 @@ func (c *Cosmos) handleGetAddrSecp256K1(data []byte) (response []byte, code [2]b
 	sessionToken := c.Token.Clone()
 
 	if err := sessionToken.Initialize(dp); err != nil {
-		return nil, commandErrWrongLength, err
+		return nil, apps.APDUExecutionError, err
 	}
 
 	pubkey, err := sessionToken.PublicKey()
 	if err != nil {
-		return nil, commandErrWrongLength, err
+		return nil, apps.APDUExecutionError, err
 	}
 
 	address, err := addressFromPubkey(pubkey, hrp)
 	if err != nil {
-		return nil, commandErrWrongLength, err
+		return nil, apps.APDUExecutionError, err
 	}
 
 	c.l.Debugw("address generation complete", "address", address)
 
-	// TODO: handle derivation path
 	return buildGetAddressResponse(
 		pubkey,
 		address,
-	), commandCodeOK, nil
+	), apps.APDUSuccess, nil
 }
 
 func addressFromPubkey(pubkey []byte, hrp string) (string, error) {
