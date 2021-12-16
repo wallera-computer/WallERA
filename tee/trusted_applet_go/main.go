@@ -16,6 +16,8 @@ import (
 	"github.com/f-secure-foundry/GoTEE/syscall"
 
 	"github.com/wallera-computer/wallera/tee/mem"
+	"github.com/wallera-computer/wallera/tee/trusted_applet_go/info"
+	"github.com/wallera-computer/wallera/tee/trusted_applet_go/token"
 	"github.com/wallera-computer/wallera/tee/trusted_os/tz/client"
 )
 
@@ -54,16 +56,38 @@ func testRPC() {
 }
 
 func main() {
+	defer applet.Exit()
 	log.Printf("PL0 %s/%s (%s) • TEE user applet (Secure World)", runtime.GOOS, runtime.GOARCH, runtime.Version())
 
-	mail, err := client.SecureRPC{}.RetrieveMail(1)
+	mail, err := client.SecureRPC{}.RetrieveMail(info.AppletID)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	log.Printf("you've got mail! %+v\n", mail)
 
-	mail.Payload = "hello from trusted applet!"
+	t := token.NewToken()
+
+	log.Printf("payload type %T\n", mail.Payload)
+	data := mail.PayloadBytes()
+
+	req, err := token.ReadRequest(data)
+	if err != nil {
+		log.Println("cannot read request:", err)
+		return
+	}
+
+	resp, err := token.Dispatch(req, t)
+	if err != nil {
+		log.Fatal("cannot dispatch:", err)
+	}
+
+	respBytes, err := token.MarshalResponse(resp)
+	if err != nil {
+		log.Fatal("cannot dispatch:", err)
+	}
+
+	mail.Payload = respBytes
 
 	err = client.SecureRPC{}.WriteResponse(mail)
 	if err != nil {
@@ -71,7 +95,4 @@ func main() {
 	}
 
 	log.Println("written response from trusted applet")
-
-	// terminate applet
-	applet.Exit()
 }
