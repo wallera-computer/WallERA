@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"github.com/f-secure-foundry/tamago/soc/imx6/usb"
-	"github.com/wallera-computer/wallera/internal/flog"
 	"github.com/wallera-computer/wallera/u2fhid"
 )
 
@@ -136,7 +135,7 @@ func hidSetup(device *usb.Device) usb.SetupFunction {
 	return func(setup *usb.SetupData) (in []byte, ack, done bool, err error) {
 		bDescriptorType := setup.Value & 0xff
 
-		flog.Logger.Println("descriptor type:", bDescriptorType, setup)
+		//flog.Logger.Println("descriptor type:", bDescriptorType, setup)
 
 		if setup.Request == usb.SET_FEATURE {
 			// stall here

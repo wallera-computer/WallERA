@@ -4,8 +4,9 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"log"
 	"math"
+
+	"go.uber.org/zap"
 )
 
 const (
@@ -151,6 +152,8 @@ type Session struct {
 	data               *bytes.Buffer
 	ShouldReadMore     bool
 	amountToRead       uint16
+
+	l *zap.SugaredLogger
 }
 
 // ReadData reads data into s.
@@ -179,8 +182,7 @@ func (s *Session) ReadData(data []byte) error {
 // ReadFrame does some basic checks on frame, and if positive will read frame data into s.
 func (s *Session) ReadFrame(frame Frame) error {
 	if s.channelID == 0 { // we're reading first frame
-		s.readFrame(frame)
-		return nil
+		return s.readFrame(frame)
 	}
 
 	if !s.ShouldReadMore {
@@ -200,8 +202,13 @@ func (s *Session) ReadFrame(frame Frame) error {
 	return nil
 }
 
-func (s *Session) readFrame(frame Frame) {
+func (s *Session) readFrame(frame Frame) error {
 	s.channelID = frame.ChannelID()
+
+	if s.channelID != 0 && frame.PacketIndex() == 0 {
+		// we're trying to read a init packet in an already initialized session
+		return fmt.Errorf("cannot read init packet in already initialized session")
+	}
 
 	s.lastReadFrameIndex = frame.PacketIndex()
 
@@ -213,7 +220,7 @@ func (s *Session) readFrame(frame Frame) {
 		// a single frame.
 		s.ShouldReadMore = !(frame.DataLength() <= hidFrameMaxDataSize)
 		s.amountToRead = frame.DataLength()
-		log.Println("expected amount to read:", s.amountToRead)
+		s.l.Debugw("read from initFrame", "amount", s.amountToRead)
 	}
 
 	if s.data.Len() >= int(s.amountToRead) {
@@ -225,8 +232,10 @@ func (s *Session) readFrame(frame Frame) {
 		lenBefTrunc := s.data.Len()
 		s.data.Truncate(int(s.amountToRead))
 		lenAftTrunc := s.data.Len()
-		log.Println("len before truncation", lenBefTrunc, "after", lenAftTrunc)
+		s.l.Debugw("data truncation", "before", lenBefTrunc, "after", lenAftTrunc)
 	}
+
+	return nil
 }
 
 const (
@@ -328,16 +337,17 @@ func (s *Session) FormatResponse(data []byte) [][]byte {
 	return ret
 }
 
-// TODO: harden this
 func (s *Session) Data() []byte {
 	return s.data.Bytes()
 }
 
 // NewSession returns a Session initialized with whatever data frame contains.
-func NewSession(data []byte) (Session, error) {
+func NewSession(data []byte, l *zap.SugaredLogger) (Session, error) {
 	s := Session{
 		data:           &bytes.Buffer{},
 		ShouldReadMore: true,
+
+		l: l,
 	}
 
 	err := s.ReadData(data)

@@ -8,8 +8,6 @@ import "C"
 import (
 	"fmt"
 	"unsafe"
-
-	"github.com/wallera-computer/wallera/u2fhid"
 )
 
 var ledgerNanoXReport = []byte{
@@ -70,7 +68,7 @@ func configureHidg(configfsPath string) error {
 		product,
 		cfp,
 		reportDescC,
-		C.ulong(len(u2fhid.DefaultReport)),
+		C.ulong(len(ledgerNanoXReport)),
 	)
 
 	if res != C.USBG_SUCCESS {
