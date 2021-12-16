@@ -19,6 +19,7 @@ import (
 	"github.com/f-secure-foundry/tamago/soc/imx6/dcp"
 
 	"github.com/wallera-computer/wallera/tee/mem"
+	"github.com/wallera-computer/wallera/tee/trusted_applet_go/info"
 	"github.com/wallera-computer/wallera/tee/trusted_os/tz"
 )
 
@@ -60,7 +61,7 @@ func init() {
 func main() {
 	tzCtx := tz.NewContext()
 
-	if err := tzCtx.RegisterApp(taELF, 1); err != nil {
+	if err := tzCtx.RegisterApp(taELF, info.AppletID); err != nil {
 		panic(err)
 	}
 
