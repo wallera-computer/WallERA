@@ -40,7 +40,6 @@ func (srpc *SecureRPC) RetrieveMail(appID uint, out *types.Mail) error {
 		return err
 	}
 
-	log.Println("mailbox contents", mail)
 	out.CopyFrom(mail)
 
 	return nil
@@ -60,7 +59,6 @@ type NonsecureRPC struct {
 }
 
 func (nsrpc *NonsecureRPC) SendMail(mail types.Mail, res *[]byte) error {
-	log.Printf("called rpc sendmail, %+v\n", mail)
 	return nsrpc.ctx.SendMail(mail)
 }
 
@@ -70,7 +68,6 @@ func (nsrpc *NonsecureRPC) RetrieveResult(appID uint, out *types.Mail) error {
 		return err
 	}
 
-	log.Println("resultbox contents", mail)
 	out.CopyFrom(mail)
 
 	return nil
@@ -99,7 +96,6 @@ func (c *Context) RetrieveMail(appID uint) (types.Mail, error) {
 	}
 
 	out := types.Mail{}
-	log.Println("mailbox contents", mail)
 	out.AppID = appID
 	out.Payload = mail
 
@@ -123,7 +119,6 @@ func (c *Context) ReadResponse(appID uint) (types.Mail, error) {
 	}
 
 	out := types.Mail{}
-	log.Println("resultbox contents", mail)
 	out.AppID = appID
 	out.Payload = mail
 
@@ -226,20 +221,17 @@ func (c *Context) RunNonsecureWorld() {
 
 func (c *Context) dispatchAppsCalls() {
 	c.mailbox.Range(func(keyRaw, value interface{}) bool {
-		log.Println("range", keyRaw, value)
 		key, ok := keyRaw.(uint)
 		if !ok {
 			panic("somehow a mailbox key isn't uint")
 		}
 
-		log.Println("range run app")
 		ta, err := c.loadTA(key)
 		if err != nil {
 			panic(fmt.Errorf("cannot load ta %v, %w", key, err))
 		}
 
 		run(ta)
-		log.Println("range done running")
 
 		return true
 	})
