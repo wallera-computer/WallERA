@@ -10,13 +10,17 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 	_ "unsafe"
 
 	"github.com/f-secure-foundry/tamago/soc/imx6"
 	_ "github.com/f-secure-foundry/tamago/soc/imx6/imx6ul"
 
+	"github.com/wallera-computer/wallera/crypto"
 	"github.com/wallera-computer/wallera/tee/mem"
+	"github.com/wallera-computer/wallera/tee/trusted_applet_go/info"
+	"github.com/wallera-computer/wallera/tee/trusted_applet_go/token"
 	"github.com/wallera-computer/wallera/tee/trusted_os/tz/client"
 	tztypes "github.com/wallera-computer/wallera/tee/trusted_os/tz/types"
 )
@@ -56,13 +60,33 @@ func init() {
 	}
 }
 
-func do() {
-	m := tztypes.Mail{
-		AppID:   1,
-		Payload: []byte("hello, world!"),
+func mnemonic() {
+
+	req := token.MnemonicRequest{
+		DerivationPath: crypto.DerivationPath{
+			Purpose:      44,
+			CoinType:     118,
+			Account:      0,
+			Change:       0,
+			AddressIndex: 0,
+		},
 	}
 
-	err := client.NonsecureRPC{}.SendMail(m)
+	resp := token.MnemonicResponse{}
+
+	reqBytes, err := token.PackageRequest(req, token.RequestMnemonic)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	m := tztypes.Mail{
+		AppID:   info.AppletID,
+		Payload: reqBytes,
+	}
+
+	log.Println("mail", m)
+
+	err = client.NonsecureRPC{}.SendMail(m)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -73,20 +97,22 @@ func do() {
 		log.Fatal(err)
 	}
 
-	log.Println("result payload", res.Payload.(string))
+	data := res.PayloadBytes()
+
+	if err := token.UnpackResponse(data, &resp); err != nil {
+		log.Fatal(err)
+	}
+
+	log.Println("generated mnemonic")
+	log.Println(strings.Join(resp.Words, ", "))
 }
 
 func main() {
 	log.Println("normal world os!")
+	defer exit()
 
-	for i := 0; i < 10; i++ {
-		log.Println("starting iteration", i)
-		do()
-		log.Println("done iteration", i)
+	for {
+		mnemonic()
 		time.Sleep(1 * time.Second)
 	}
-
-	log.Println("exiting")
-
-	exit()
 }
