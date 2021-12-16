@@ -1,1 +1,5 @@
 /wallera-linux
+*.elf
+*.bin
+*.dcd
+*.imx
