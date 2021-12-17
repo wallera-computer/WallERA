@@ -9,6 +9,43 @@ import (
 	"go.uber.org/zap"
 )
 
+var LedgerNanoXReport = []byte{
+	0x06,
+	0xA0,
+	0xFF,
+	0x09,
+	0x01,
+	0xA1,
+	0x01,
+	0x09,
+	0x03,
+	0x15,
+	0x00,
+	0x26,
+	0xFF,
+	0x00,
+	0x75,
+	0x08,
+	0x95,
+	0x40,
+	0x81,
+	0x08,
+	0x09,
+	0x04,
+	0x15,
+	0x00,
+	0x26,
+	0xFF,
+	0x00,
+	0x75,
+	0x08,
+	0x95,
+	0x40,
+	0x91,
+	0x08,
+	0xC0,
+}
+
 const (
 	hidFrameMaxDataSize = 57
 	hidFrameTag         = 0x05
@@ -203,12 +240,12 @@ func (s *Session) ReadFrame(frame Frame) error {
 }
 
 func (s *Session) readFrame(frame Frame) error {
-	s.channelID = frame.ChannelID()
-
 	if s.channelID != 0 && frame.PacketIndex() == 0 {
 		// we're trying to read a init packet in an already initialized session
 		return fmt.Errorf("cannot read init packet in already initialized session")
 	}
+
+	s.channelID = frame.ChannelID()
 
 	s.lastReadFrameIndex = frame.PacketIndex()
 
