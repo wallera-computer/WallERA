@@ -2,9 +2,11 @@ package token
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 
+	"github.com/mitchellh/mapstructure"
 	"github.com/wallera-computer/wallera/crypto"
 )
 
@@ -18,7 +20,7 @@ const (
 
 type Request struct {
 	ID   uint
-	Data []byte
+	Data interface{}
 }
 
 type RandomBytesRequest struct {
@@ -63,7 +65,7 @@ type SupportedSignAlgorithmsResponse struct {
 
 type Response struct {
 	ID   uint
-	Data []byte
+	Data interface{}
 }
 
 func ReadRequest(data []byte) (Request, error) {
@@ -84,30 +86,26 @@ func Unmarshal(b []byte, i interface{}) error {
 }
 
 func PackageRequest(req interface{}, reqCode uint) ([]byte, error) {
-	reqBytes, err := Marshal(req)
-	if err != nil {
-		return nil, err
-	}
-
 	rr := Request{
 		ID:   reqCode,
-		Data: reqBytes,
+		Data: req,
 	}
 
 	return Marshal(rr)
 }
 
 func UnpackResponse(resp []byte, dest interface{}) error {
-	req := Response{}
-	if err := unmarshal(resp, &req); err != nil {
+	r := Response{}
+	if err := unmarshal(resp, &r); err != nil {
 		return err
 	}
 
-	if err := unmarshal(req.Data, &dest); err != nil {
+	b, err := base64.StdEncoding.DecodeString(r.Data.(string))
+	if err != nil {
 		return err
 	}
 
-	return nil
+	return json.Unmarshal(b, dest)
 }
 
 func Dispatch(req Request, t crypto.Token) (Response, error) {
@@ -117,8 +115,9 @@ func Dispatch(req Request, t crypto.Token) (Response, error) {
 	switch req.ID {
 	case RequestRandomBytes:
 		r := RandomBytesRequest{}
-		if err := unmarshal(req.Data, &r); err != nil {
-			return Response{}, err
+		err := mapstructure.Decode(req.Data, &r)
+		if err != nil {
+			return Response{}, fmt.Errorf("cannot unmarshal into structure, %w", err)
 		}
 
 		rb, err := t.RandomBytes(r.Amount)
@@ -137,8 +136,9 @@ func Dispatch(req Request, t crypto.Token) (Response, error) {
 		resp.Data, dispatchErr = marshal(rbResp)
 	case RequestSign:
 		r := SignRequest{}
-		if err := unmarshal(req.Data, &r); err != nil {
-			return Response{}, err
+		err := mapstructure.Decode(req.Data, &r)
+		if err != nil {
+			return Response{}, fmt.Errorf("cannot unmarshal into structure, %w", err)
 		}
 
 		tt := t.Clone()
@@ -162,8 +162,9 @@ func Dispatch(req Request, t crypto.Token) (Response, error) {
 		resp.Data, dispatchErr = marshal(sResp)
 	case RequestPublicKey:
 		r := PublicKeyRequest{}
-		if err := unmarshal(req.Data, &r); err != nil {
-			return Response{}, err
+		err := mapstructure.Decode(req.Data, &r)
+		if err != nil {
+			return Response{}, fmt.Errorf("cannot unmarshal into structure, %w", err)
 		}
 
 		tt := t.Clone()
@@ -187,8 +188,9 @@ func Dispatch(req Request, t crypto.Token) (Response, error) {
 		resp.Data, dispatchErr = marshal(pkResp)
 	case RequestMnemonic:
 		r := MnemonicRequest{}
-		if err := unmarshal(req.Data, &r); err != nil {
-			return Response{}, err
+		err := mapstructure.Decode(req.Data, &r)
+		if err != nil {
+			return Response{}, fmt.Errorf("cannot unmarshal into structure, %w", err)
 		}
 
 		tt := t.Clone()
@@ -211,11 +213,6 @@ func Dispatch(req Request, t crypto.Token) (Response, error) {
 
 		resp.Data, dispatchErr = marshal(mnResp)
 	case RequestSupportedSignAlgorithms:
-		r := MnemonicRequest{}
-		if err := unmarshal(req.Data, &r); err != nil {
-			return Response{}, err
-		}
-
 		data := t.SupportedSignAlgorithms()
 
 		resp = Response{
