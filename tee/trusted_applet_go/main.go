@@ -64,11 +64,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	log.Printf("you've got mail! %+v\n", mail)
-
 	t := token.NewToken()
 
-	log.Printf("payload type %T\n", mail.Payload)
 	data := mail.PayloadBytes()
 
 	req, err := token.ReadRequest(data)
