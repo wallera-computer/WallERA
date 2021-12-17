@@ -1,4 +1,4 @@
-package main
+package crypto
 
 import (
 	"crypto/hmac"
@@ -10,12 +10,11 @@ import (
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcutil/hdkeychain"
 	"github.com/cosmos/go-bip39"
-	"github.com/wallera-computer/wallera/crypto"
 )
 
 // Compile-time check which fails if dumbToken doesn't comply with
 // crypto.Token interface.
-var _ crypto.Token = (*dumbToken)(nil)
+var _ Token = (*dumbToken)(nil)
 
 var defaultEntropy = []byte{
 	118, 252, 209, 103,
@@ -34,7 +33,7 @@ type dumbToken struct {
 
 // NewDumbToken returns a new instance of dumbToken.
 // Callers should Clone() this instance and then call Initialize().
-func NewDumbToken() crypto.Token {
+func NewDumbToken() Token {
 	return &dumbToken{}
 }
 
@@ -53,7 +52,7 @@ func (dt *dumbToken) RandomBytes(amount uint64) ([]byte, error) {
 }
 
 func (dt *dumbToken) DeriveSecret() ([32]byte, error) {
-	h := hmac.New(sha256.New, crypto.Diversifier())
+	h := hmac.New(sha256.New, Diversifier())
 	if _, err := h.Write(defaultEntropy); err != nil {
 		return [32]byte{}, fmt.Errorf("cannot generate secret, %w", err)
 	}
@@ -69,7 +68,7 @@ func (dt *dumbToken) DeriveSecret() ([32]byte, error) {
 	return ret, nil
 }
 
-func (dt *dumbToken) Initialize(path crypto.DerivationPath) error {
+func (dt *dumbToken) Initialize(path DerivationPath) error {
 	secret, err := dt.DeriveSecret()
 	if err != nil {
 		return err
@@ -83,7 +82,7 @@ func (dt *dumbToken) Initialize(path crypto.DerivationPath) error {
 		return err
 	}
 
-	dt.privKey, err = crypto.KeyFromPath(sb, path)
+	dt.privKey, err = KeyFromPath(sb, path)
 	if err != nil {
 		return err
 	}
@@ -91,7 +90,7 @@ func (dt *dumbToken) Initialize(path crypto.DerivationPath) error {
 	return nil
 }
 
-func (dt *dumbToken) Sign(data []byte, algorithm crypto.Algorithm) ([]byte, error) {
+func (dt *dumbToken) Sign(data []byte, algorithm Algorithm) ([]byte, error) {
 	pk, err := dt.privKey.ECPrivKey()
 	if err != nil {
 		return nil, err
@@ -133,13 +132,13 @@ func (dt *dumbToken) Mnemonic() ([]string, error) {
 	return strings.Split(mnemonic, " "), nil
 }
 
-func (dt *dumbToken) SupportedSignAlgorithms() []crypto.Algorithm {
-	return []crypto.Algorithm{
-		crypto.AlgoSecp256K1,
+func (dt *dumbToken) SupportedSignAlgorithms() []Algorithm {
+	return []Algorithm{
+		AlgoSecp256K1,
 	}
 }
 
-func (dt *dumbToken) Clone() crypto.Token {
+func (dt *dumbToken) Clone() Token {
 	cl := *dt
 	return &cl
 }

@@ -1,11 +1,10 @@
-package main
+package crypto
 
 import (
 	"encoding/hex"
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/wallera-computer/wallera/crypto"
 )
 
 const (
@@ -35,7 +34,7 @@ func pubKeyBytes(t *testing.T) []byte {
 
 func Test_dumbToken_MnemonicReturnsAFullSlice(t *testing.T) {
 	dt := &dumbToken{}
-	require.NoError(t, dt.Initialize(crypto.DerivationPath{
+	require.NoError(t, dt.Initialize(DerivationPath{
 		Purpose:      44,
 		CoinType:     118,
 		Account:      0,
@@ -73,7 +72,7 @@ func Test_dumbToken_DeriveSecretIsIdempotent(t *testing.T) {
 
 func Test_dumbToken_PublicKey(t *testing.T) {
 	dt := &dumbToken{}
-	require.NoError(t, dt.Initialize(crypto.DerivationPath{
+	require.NoError(t, dt.Initialize(DerivationPath{
 		Purpose:      44,
 		CoinType:     118,
 		Account:      0,
