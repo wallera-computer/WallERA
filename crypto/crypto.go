@@ -7,6 +7,7 @@ import (
 	"github.com/btcsuite/btcutil/hdkeychain"
 )
 
+//go:generate stringer -type=Algorithm
 type Algorithm uint
 
 const (
