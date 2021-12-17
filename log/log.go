@@ -2,8 +2,8 @@ package log
 
 import "go.uber.org/zap"
 
-func Production(_ ...zap.Option) {
-	zap.ReplaceGlobals(zap.NewNop())
+func Production(_ ...zap.Option) *zap.Logger {
+	return zap.NewNop()
 }
 
 func Development(opts ...zap.Option) *zap.Logger {
@@ -16,7 +16,5 @@ func Development(opts ...zap.Option) *zap.Logger {
 		panic(err)
 	}
 
-	zap.ReplaceGlobals(l)
-
-	return zap.L()
+	return l
 }
