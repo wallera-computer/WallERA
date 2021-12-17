@@ -1,11 +1,11 @@
 package main
 
 import (
-	"github.com/99designs/keyring"
 	"github.com/f-secure-foundry/tamago/soc/imx6/usb"
+	"github.com/wallera-computer/wallera"
 )
 
-func baseConfiguration(device *usb.Device) {
+func baseConfiguration(device *usb.Device) error {
 	// Supported Language Code Zero: English
 	device.SetLanguageCodes([]uint16{0x0409})
 
@@ -18,49 +18,60 @@ func baseConfiguration(device *usb.Device) {
 	device.Descriptor.DeviceSubClass = 0x0
 	device.Descriptor.DeviceProtocol = 0x0
 
-	// http://pid.codes/1209/2702/
-	// Standard USB Armory {Vendor,Product}ID
-	device.Descriptor.VendorId = 0x1209
-	device.Descriptor.ProductId = 0x2702
+	// Ledger Nano X USB IDs
+	device.Descriptor.VendorId = 0x2c97
+	device.Descriptor.ProductId = 0x4011
 
 	device.Descriptor.Device = 0x0001
 
-	iManufacturer, err := device.AddString(`gsora`)
-	notErr(err)
+	iManufacturer, err := device.AddString(`Ledger`)
+	if err != nil {
+		return err
+	}
+
 	device.Descriptor.Manufacturer = iManufacturer
 
-	iProduct, err := device.AddString(`fidati`)
-	notErr(err)
+	iProduct, err := device.AddString(`Nano X`)
+	if err != nil {
+		return err
+	}
+
 	device.Descriptor.Product = iProduct
 
-	iSerial, err := device.AddString(`0.42`)
-	notErr(err)
+	iSerial, err := device.AddString(`0001`)
+	if err != nil {
+		return err
+	}
+
 	device.Descriptor.SerialNumber = iSerial
+
+	return nil
 }
 
-func startUSB(keyring *keyring.Keyring) {
-	/*device := &usb.Device{}
+func startUSB(handler wallera.HIDHandler) error {
+	device := &usb.Device{}
 
-	token, err := u2ftoken.New(keyring, attestationCertificate, attestationPrivkey)
-	notErr(err)
-
-	hid, err := u2fhid.NewHandler(token)
-	notErr(err)
-
-	conf := fidati.DefaultConfiguration()
+	cd := usb.ConfigurationDescriptor{}
+	cd.SetDefaults()
+	cd.Attributes = 160
 
 	baseConfiguration(device)
 
-	err = device.AddConfiguration(&conf)
-	notErr(err)
+	err := device.AddConfiguration(&cd)
+	if err != nil {
+		return err
+	}
 
-	err = fidati.ConfigureUSB(&conf, device, hid)
-	notErr(err)
+	if err := wallera.ConfigureUSB(&cd, device, handler); err != nil {
+		return err
+	}
 
 	usb.USB1.Init()
 	usb.USB1.DeviceMode()
 	usb.USB1.Reset()
 
 	// never returns
-	usb.USB1.Start(device)*/
+	usb.USB1.Start(device)
+
+	return nil
 }

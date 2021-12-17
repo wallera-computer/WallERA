@@ -1,13 +1,16 @@
 package main
 
 import (
-	"fmt"
-	"log"
 	"runtime"
 	"runtime/debug"
+	"time"
 
 	usbarmory "github.com/f-secure-foundry/tamago/board/f-secure/usbarmory/mark-two"
 	"github.com/f-secure-foundry/tamago/soc/imx6"
+	"github.com/wallera-computer/wallera/apps"
+	"github.com/wallera-computer/wallera/apps/cosmos"
+	"github.com/wallera-computer/wallera/crypto"
+	"go.uber.org/zap"
 )
 
 var (
@@ -16,120 +19,62 @@ var (
 
 	// Revision contains the git revision (last hash and/or tag).
 	Revision string
-
-	banner string
 )
 
 func init() {
-	banner = fmt.Sprintf("%s/%s (%s) • %s %s",
-		runtime.GOOS, runtime.GOARCH, runtime.Version(),
-		Revision, Build)
+	l := logger()
 
-	log.SetFlags(log.Lshortfile)
-	//enableLogs()
-
-	model := imx6.Model()
-	_, family, revMajor, revMinor := imx6.SiliconVersion()
+	l.Infow("wallera started", "GOOS", runtime.GOOS, "GOARCH", runtime.GOARCH, "GOVERSION", runtime.Version(), "revision", Revision, "build", Build)
 
 	if !imx6.Native {
-		log.Fatal("running fidati on emulated hardware is not supported")
+		l.Fatal("running wallera on emulated hardware is not supported")
 	}
 
-	if err := imx6.SetARMFreq(900); err != nil {
-		log.Printf("WARNING: error setting ARM frequency: %v", err)
+	debugConsole, _ := usbarmory.DetectDebugAccessory(250 * time.Millisecond)
+	<-debugConsole
+
+	if err := imx6.SetARMFreq(imx6.FreqLow); err != nil {
+		l.Warnf("WARNING: error setting ARM frequency: %v", err)
 	}
-
-	banner += fmt.Sprintf(" • %s %d MHz", model, imx6.ARMFreq()/1000000)
-
-	log.Printf("imx6_soc: %s (%#x, %d.%d) @ %d MHz - native:%v",
-		model, family, revMajor, revMinor, imx6.ARMFreq()/1000000, imx6.Native)
-
-	err := usbarmory.SD.Detect()
-	if err != nil {
-		panic(err)
-	}
-
-	//readCertPrivkey()
-
-	//leds.StartBlink()
 }
 
 func main() {
 	defer catchPanic()
 
-	log.Println(banner)
+	l := logger()
 
-	go rebootWatcher()
+	t := crypto.NewDumbToken()
 
-	//s := &sd{}
+	ah := apps.NewHandler()
+	ah.Register(&cosmos.Cosmos{
+		Token: t,
+	})
 
-	/*if err := blank(); err != nil {
-		panic(err)
+	hh := newHidHandler(l, ah)
+
+	if err := startUSB(hh); err != nil {
+		l.Panic(err)
 	}
 
-	var store *storage.Storage
-	data, err := readStorageData(s)
-	if err != nil && err != noData {
-		panic(err)
-	} else if err == noData {
-		st, err := storage.New(s, nil)
-		if err != nil {
-			panic(err)
-		}
-
-		store = st
-	} else {
-		st, err := storage.New(s, data)
-		if err != nil {
-			panic(err)
-		}
-
-		store = st
-	}*/
-
-	/*counter, err := readSdCounter()
-	if err != nil {
-		panic(err)
-	}
-
-	k := genKeyring(attestationPrivkey, counter)
-	startUSB(k)*/
-}
-
-func rebootWatcher() {
-	buf := make([]byte, 1)
-
-	for {
-		runtime.Gosched()
-		imx6.UART2.Read(buf)
-		if buf[0] == 0 {
-			continue
-		}
-
-		if buf[0] == 'r' {
-			log.Println("rebooting...")
-			imx6.Reboot()
-		}
-
-		buf[0] = 0
-	}
+	usbarmory.Reset()
 }
 
 // catchPanic catches every panic(), sets the LEDs into error mode and prints the stacktrace.
 func catchPanic() {
+	l := logger()
 	if r := recover(); r != nil {
-		//leds.Panic()
-		fmt.Printf("panic: %v\n\n", r)
-		fmt.Println(string(debug.Stack()))
+		l.Errorf("panic: %v\n\n", r)
+		l.Error(string(debug.Stack()))
+		l.Warn("rebooting in 1 second...")
 
-		for {
-		} // stuck here forever!
+		time.Sleep(1 * time.Second)
+		usbarmory.Reset()
 	}
 }
 
 // since we're in a critical configuration phase, panic on error.
-func notErr(e error) {
+func notErr(e error, l *zap.SugaredLogger) {
 	if e != nil {
-		panic(e)
+		l.Panic(e)
 	}
 }

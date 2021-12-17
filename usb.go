@@ -1,4 +1,4 @@
-package fidati
+package wallera
 
 import (
 	"bytes"
@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	"github.com/f-secure-foundry/tamago/soc/imx6/usb"
-	"github.com/wallera-computer/wallera/u2fhid"
+	wallerausb "github.com/wallera-computer/wallera/usb"
 )
 
 const (
@@ -15,6 +15,11 @@ const (
 	hidRequestTypeGetDescriptor = 0x21
 	descriptorTypeGetReport     = 0x22
 )
+
+type HIDHandler interface {
+	Tx(buf []byte, lastErr error) (res []byte, err error)
+	Rx(buf []byte, lastErr error) (res []byte, err error)
+}
 
 // hidDescriptor represents a HID standard descriptor.
 // Device Class Definition for Human Interface Devices (HID) Version 1.11, pg 22.
@@ -44,7 +49,7 @@ func (d *hidDescriptor) bytes() []byte {
 
 // configureDevice configures device to use hidSetup Setup function, and adds an HID InterfaceDescriptor to conf
 // along with the needed Endpoints.
-func configureDevice(device *usb.Device, conf *usb.ConfigurationDescriptor, u2fHandler *u2fhid.Handler) error {
+func configureDevice(device *usb.Device, conf *usb.ConfigurationDescriptor, handler HIDHandler) error {
 	device.Setup = hidSetup(device)
 
 	id, err := addInterface(device, conf)
@@ -53,8 +58,8 @@ func configureDevice(device *usb.Device, conf *usb.ConfigurationDescriptor, u2fH
 	}
 
 	endpoints := addEndpoints(id)
-	endpoints.in.Function = u2fHandler.Tx
-	endpoints.out.Function = u2fHandler.Rx
+	endpoints.in.Function = handler.Tx
+	endpoints.out.Function = handler.Rx
 
 	addHIDClassDescriptor(id)
 
@@ -117,7 +122,7 @@ func addEndpoints(conf *usb.InterfaceDescriptor) endpoints {
 }
 
 // addHIDClassDescriptor adds a HID class descriptor to conf.
-// The report descriptor length is len(u2fhid.DefaultReport).
+// The report descriptor length is len(LedgerNanoXReport).
 func addHIDClassDescriptor(conf *usb.InterfaceDescriptor) {
 	hid := hidDescriptor{}
 	hid.setDefaults()
@@ -125,7 +130,7 @@ func addHIDClassDescriptor(conf *usb.InterfaceDescriptor) {
 	hid.NumDescriptors = 0x01
 	hid.ReportDescriptorType = 0x22
 
-	hid.DescriptorLength = uint16(len(u2fhid.DefaultReport))
+	hid.DescriptorLength = uint16(len(wallerausb.LedgerNanoXReport))
 
 	conf.ClassDescriptors = append(conf.ClassDescriptors, hid.bytes())
 }
@@ -134,8 +139,6 @@ func addHIDClassDescriptor(conf *usb.InterfaceDescriptor) {
 func hidSetup(device *usb.Device) usb.SetupFunction {
 	return func(setup *usb.SetupData) (in []byte, ack, done bool, err error) {
 		bDescriptorType := setup.Value & 0xff
-
-		//flog.Logger.Println("descriptor type:", bDescriptorType, setup)
 
 		if setup.Request == usb.SET_FEATURE {
 			// stall here
@@ -154,7 +157,7 @@ func hidSetup(device *usb.Device) usb.SetupFunction {
 
 		if setup.Request == usb.GET_DESCRIPTOR {
 			if bDescriptorType == descriptorTypeGetReport {
-				in = u2fhid.DefaultReport.Bytes()
+				in = wallerausb.LedgerNanoXReport
 				done = true
 				return
 			}
@@ -173,7 +176,7 @@ func DefaultConfiguration() usb.ConfigurationDescriptor {
 	return cd
 }
 
-// ConfigureUSB configures device and config to be used as a FIDO2 U2F token.
-func ConfigureUSB(config *usb.ConfigurationDescriptor, device *usb.Device, u2fHandler *u2fhid.Handler) error {
-	return configureDevice(device, config, u2fHandler)
+// ConfigureUSB configures device and config to be used as a HID handler.
+func ConfigureUSB(config *usb.ConfigurationDescriptor, device *usb.Device, handler HIDHandler) error {
+	return configureDevice(device, config, handler)
 }
