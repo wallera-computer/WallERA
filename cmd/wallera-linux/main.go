@@ -10,6 +10,7 @@ import (
 
 	"github.com/wallera-computer/wallera/apps"
 	"github.com/wallera-computer/wallera/apps/cosmos"
+	"github.com/wallera-computer/wallera/crypto"
 	"github.com/wallera-computer/wallera/log"
 	"github.com/wallera-computer/wallera/usb"
 	"go.uber.org/zap"
@@ -78,7 +79,7 @@ func main() {
 	// add 50ms delay in both rx and tx
 	// we don't wanna burn laptop cpus :^)
 
-	t := NewDumbToken()
+	t := crypto.NewDumbToken()
 
 	ah := apps.NewHandler()
 	ah.Register(&cosmos.Cosmos{

@@ -1,54 +1,19 @@
 package main
 
+import (
+	"fmt"
+	"unsafe"
+
+	wallerausb "github.com/wallera-computer/wallera/usb"
+)
+
 // #cgo LDFLAGS: -lusbgx
 // #include "gadget-hid.h"
 // #include <stdlib.h>
 import "C"
 
-import (
-	"fmt"
-	"unsafe"
-)
-
-var ledgerNanoXReport = []byte{
-	0x06,
-	0xA0,
-	0xFF,
-	0x09,
-	0x01,
-	0xA1,
-	0x01,
-	0x09,
-	0x03,
-	0x15,
-	0x00,
-	0x26,
-	0xFF,
-	0x00,
-	0x75,
-	0x08,
-	0x95,
-	0x40,
-	0x81,
-	0x08,
-	0x09,
-	0x04,
-	0x15,
-	0x00,
-	0x26,
-	0xFF,
-	0x00,
-	0x75,
-	0x08,
-	0x95,
-	0x40,
-	0x91,
-	0x08,
-	0xC0,
-}
-
 func configureHidg(configfsPath string) error {
-	reportDescC := (*C.char)(unsafe.Pointer(&ledgerNanoXReport[0]))
+	reportDescC := (*C.char)(unsafe.Pointer(&wallerausb.LedgerNanoXReport[0]))
 
 	serial := C.CString("0001")
 	manufacturer := C.CString("Ledger")
@@ -68,7 +33,7 @@ func configureHidg(configfsPath string) error {
 		product,
 		cfp,
 		reportDescC,
-		C.ulong(len(ledgerNanoXReport)),
+		C.ulong(len(wallerausb.LedgerNanoXReport)),
 	)
 
 	if res != C.USBG_SUCCESS {
