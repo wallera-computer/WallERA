@@ -36,6 +36,20 @@ type SignRequest struct {
 	DerivationPath crypto.DerivationPath
 	Algorithm      crypto.Algorithm
 }
+type signRequestInternal struct {
+	Data           string
+	DerivationPath crypto.DerivationPath
+	Algorithm      crypto.Algorithm
+}
+
+func (sri signRequestInternal) Bytes() []byte {
+	b, err := base64.StdEncoding.DecodeString(sri.Data)
+	if err != nil {
+		panic(err)
+	}
+
+	return b
+}
 
 type SignResponse struct {
 	Data []byte
@@ -135,7 +149,8 @@ func Dispatch(req Request, t crypto.Token) (Response, error) {
 
 		resp.Data, dispatchErr = marshal(rbResp)
 	case RequestSign:
-		r := SignRequest{}
+		r := signRequestInternal{}
+
 		err := mapstructure.Decode(req.Data, &r)
 		if err != nil {
 			return Response{}, fmt.Errorf("cannot unmarshal into structure, %w", err)
@@ -146,7 +161,7 @@ func Dispatch(req Request, t crypto.Token) (Response, error) {
 			return Response{}, err
 		}
 
-		data, err := tt.Sign(r.Data, r.Algorithm)
+		data, err := tt.Sign(r.Bytes(), r.Algorithm)
 		if err != nil {
 			return Response{}, err
 		}
