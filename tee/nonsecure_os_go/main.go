@@ -7,6 +7,8 @@
 package main
 
 import (
+	"bytes"
+	"crypto/sha256"
 	"fmt"
 	"log"
 	"os"
@@ -73,32 +75,7 @@ func mnemonic() error {
 
 	resp := token.MnemonicResponse{}
 
-	reqBytes, err := token.PackageRequest(req, token.RequestMnemonic)
-	if err != nil {
-		return err
-	}
-
-	m := tztypes.Mail{
-		AppID:   info.AppletID,
-		Payload: reqBytes,
-	}
-
-	log.Println("mail", m)
-
-	err = client.NonsecureRPC{}.SendMail(m)
-	if err != nil {
-		return err
-	}
-
-	log.Println("calling retrieveresult from nonsecure world")
-	res, err := client.NonsecureRPC{}.RetrieveResult(m.AppID)
-	if err != nil {
-		return err
-	}
-
-	data := res.PayloadBytes()
-
-	if err := token.UnpackResponse(data, &resp); err != nil {
+	if err := doRequest(token.RequestMnemonic, req, &resp); err != nil {
 		return err
 	}
 
@@ -108,15 +85,150 @@ func mnemonic() error {
 	return nil
 }
 
+func pubkey() error {
+	req := token.PublicKeyRequest{
+		DerivationPath: crypto.DerivationPath{
+			Purpose:      44,
+			CoinType:     118,
+			Account:      0,
+			Change:       0,
+			AddressIndex: 0,
+		},
+	}
+
+	resp := token.PublicKeyResponse{}
+
+	if err := doRequest(token.RequestPublicKey, req, &resp); err != nil {
+		return err
+	}
+
+	log.Println("generated pubkey")
+	log.Println(resp.Data)
+
+	return nil
+}
+
+func randomBytes() error {
+	req := token.RandomBytesRequest{
+		Amount: 42,
+	}
+
+	resp := token.RandomBytesResponse{}
+
+	if err := doRequest(token.RequestRandomBytes, req, &resp); err != nil {
+		return err
+	}
+
+	log.Println("generated random bytes")
+	log.Println(len(resp.Data), resp.Data)
+
+	return nil
+}
+
+func sign() error {
+	signData := bytes.Repeat([]byte{42}, 42)
+	hs := sha256.Sum256(signData)
+
+	req := token.SignRequest{
+		Data: hs[:],
+		DerivationPath: crypto.DerivationPath{
+			Purpose:      44,
+			CoinType:     118,
+			Account:      0,
+			Change:       0,
+			AddressIndex: 0,
+		},
+		Algorithm: crypto.AlgoSecp256K1,
+	}
+
+	resp := token.SignResponse{}
+
+	if err := doRequest(token.RequestSign, req, &resp); err != nil {
+		return err
+	}
+
+	log.Println("generated signature")
+	log.Println(len(resp.Data), resp.Data)
+
+	return nil
+}
+
+func supportedAlgorithms() error {
+	resp := token.SupportedSignAlgorithmsResponse{}
+
+	if err := doRequest(token.RequestSupportedSignAlgorithms, nil, &resp); err != nil {
+		return err
+	}
+
+	log.Println("supported algorithms")
+	sa := []string{}
+	for _, a := range resp.Algorithms {
+		sa = append(sa, a.String())
+	}
+
+	log.Println(strings.Join(sa, ", "))
+
+	return nil
+}
+
+func doRequest(reqType uint, input interface{}, output interface{}) error {
+	reqBytes, err := token.PackageRequest(input, reqType)
+	if err != nil {
+		return err
+	}
+
+	m := tztypes.Mail{
+		AppID:   info.AppletID,
+		Payload: reqBytes,
+	}
+
+	err = client.NonsecureRPC{}.SendMail(m)
+	if err != nil {
+		return err
+	}
+
+	log.Println("mail sent")
+
+	res, err := client.NonsecureRPC{}.RetrieveResult(m.AppID)
+	if err != nil {
+		return err
+	}
+
+	data := res.PayloadBytes()
+
+	if err := token.UnpackResponse(data, &output); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func main() {
 	log.Println("normal world os!")
 	defer exit()
 
-	for {
-		if err := mnemonic(); err != nil {
-			log.Println(err)
-			break
-		}
-		time.Sleep(1 * time.Second)
+	funcList := []func() error{
+		mnemonic,
+		pubkey,
+		sign,
+		randomBytes,
+		supportedAlgorithms,
 	}
+
+	var ferr error
+	for i, f := range funcList {
+		log.Println("calling function", i)
+		if ferr = f(); ferr != nil {
+			return
+		}
+	}
+
+	if ferr != nil {
+		log.Println(ferr)
+		return
+	}
+
+	log.Println("finished running")
+
+	time.Sleep(1 * time.Second)
 }
