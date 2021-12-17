@@ -60,8 +60,7 @@ func init() {
 	}
 }
 
-func mnemonic() {
-
+func mnemonic() error {
 	req := token.MnemonicRequest{
 		DerivationPath: crypto.DerivationPath{
 			Purpose:      44,
@@ -76,7 +75,7 @@ func mnemonic() {
 
 	reqBytes, err := token.PackageRequest(req, token.RequestMnemonic)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	m := tztypes.Mail{
@@ -88,23 +87,25 @@ func mnemonic() {
 
 	err = client.NonsecureRPC{}.SendMail(m)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	log.Println("calling retrieveresult from nonsecure world")
 	res, err := client.NonsecureRPC{}.RetrieveResult(m.AppID)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	data := res.PayloadBytes()
 
 	if err := token.UnpackResponse(data, &resp); err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	log.Println("generated mnemonic")
 	log.Println(strings.Join(resp.Words, ", "))
+
+	return nil
 }
 
 func main() {
@@ -112,7 +113,10 @@ func main() {
 	defer exit()
 
 	for {
-		mnemonic()
+		if err := mnemonic(); err != nil {
+			log.Println(err)
+			break
+		}
 		time.Sleep(1 * time.Second)
 	}
 }
