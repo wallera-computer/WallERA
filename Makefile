@@ -11,7 +11,8 @@ TARGET ?= "usbarmory"
 GOENV := GO_EXTLINK_ENABLED=0 CGO_ENABLED=0 GOOS=tamago GOARM=7 GOARCH=arm
 TEXT_START := 0x80010000 # ramStart (defined in imx6/imx6ul/memory.go) + 0x10000
 LDFLAGS = -s -w -T $(TEXT_START) -E _rt0_arm_tamago -R 0x1000 -X 'main.Build=${BUILD}' -X 'main.Revision=${REV}'
-GOFLAGS = -tags ${TARGET} -ldflags "${LDFLAGS}"
+DEBUG_TAG = "debug"
+GOFLAGS = -tags ${TARGET},${DEBUG_TAG} -ldflags "${LDFLAGS}"
 SHELL = /bin/bash
 
 .PHONY: clean install test wallera-linux setup-wallera-linux
@@ -50,7 +51,6 @@ check_hab_keys:
 
 dcd:
 	@if test "${TARGET}" = "usbarmory"; then \
-  		echo $(TAMAGO_PKG)\
 		cp -f $(GOMODCACHE)/$(TAMAGO_PKG)/board/f-secure/usbarmory/mark-two/imximage.cfg $(APP).dcd; \
 	elif test "${TARGET}" = "mx6ullevk"; then \
 		cp -f $(GOMODCACHE)/$(TAMAGO_PKG)/board/nxp/mx6ullevk/imximage.cfg $(APP).dcd; \
@@ -60,8 +60,7 @@ dcd:
 	fi
 
 clean:
-	rm -f $(APP)
-	@rm -fr $(APP).bin $(APP).imx $(APP)-signed.imx $(APP).csf $(APP).dcd
+	rm -fr $(APP) $(APP).bin $(APP).imx $(APP)-signed.imx $(APP).csf $(APP).dcd $(APP)-linux
 
 install: $(APP)
 	@ssh usbarmory@10.0.0.1 sudo rm /boot/tamago
@@ -69,7 +68,7 @@ install: $(APP)
 	@ssh usbarmory@10.0.0.1 sudo reboot
 
 wallera-linux:
-	$(TAMAGO) build -tags='wallera_logs' -gcflags "all=-N -l" -o ./wallera-linux ./cmd/wallera-linux 
+	$(TAMAGO) build -gcflags "all=-N -l" -o ./wallera-linux ./cmd/wallera-linux 
 
 setup-wallera-linux: wallera-linux
 	@echo "You will be prompted for your root password, because we have to load some kernel modules and setup permissions"
