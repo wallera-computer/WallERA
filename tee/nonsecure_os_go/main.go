@@ -64,6 +64,9 @@ func init() {
 
 func mnemonic() error {
 	req := token.MnemonicRequest{
+		Request: token.Request{
+			ID: token.RequestMnemonic,
+		},
 		DerivationPath: crypto.DerivationPath{
 			Purpose:      44,
 			CoinType:     118,
@@ -75,7 +78,7 @@ func mnemonic() error {
 
 	resp := token.MnemonicResponse{}
 
-	if err := doRequest(token.RequestMnemonic, req, &resp); err != nil {
+	if err := doRequest(req, &resp); err != nil {
 		return err
 	}
 
@@ -87,6 +90,9 @@ func mnemonic() error {
 
 func pubkey() error {
 	req := token.PublicKeyRequest{
+		Request: token.Request{
+			ID: token.RequestPublicKey,
+		},
 		DerivationPath: crypto.DerivationPath{
 			Purpose:      44,
 			CoinType:     118,
@@ -98,7 +104,7 @@ func pubkey() error {
 
 	resp := token.PublicKeyResponse{}
 
-	if err := doRequest(token.RequestPublicKey, req, &resp); err != nil {
+	if err := doRequest(req, &resp); err != nil {
 		return err
 	}
 
@@ -110,12 +116,15 @@ func pubkey() error {
 
 func randomBytes() error {
 	req := token.RandomBytesRequest{
+		Request: token.Request{
+			ID: token.RequestRandomBytes,
+		},
 		Amount: 42,
 	}
 
 	resp := token.RandomBytesResponse{}
 
-	if err := doRequest(token.RequestRandomBytes, req, &resp); err != nil {
+	if err := doRequest(req, &resp); err != nil {
 		return err
 	}
 
@@ -130,6 +139,9 @@ func sign() error {
 	hs := sha256.Sum256(signData)
 
 	req := token.SignRequest{
+		Request: token.Request{
+			ID: token.RequestSign,
+		},
 		Data: hs[:],
 		DerivationPath: crypto.DerivationPath{
 			Purpose:      44,
@@ -143,7 +155,7 @@ func sign() error {
 
 	resp := token.SignResponse{}
 
-	if err := doRequest(token.RequestSign, req, &resp); err != nil {
+	if err := doRequest(req, &resp); err != nil {
 		return err
 	}
 
@@ -154,9 +166,15 @@ func sign() error {
 }
 
 func supportedAlgorithms() error {
+	req := token.SupportedSignAlgorithmsRequest{
+		Request: token.Request{
+			ID: token.RequestSupportedSignAlgorithms,
+		},
+	}
+
 	resp := token.SupportedSignAlgorithmsResponse{}
 
-	if err := doRequest(token.RequestSupportedSignAlgorithms, nil, &resp); err != nil {
+	if err := doRequest(req, &resp); err != nil {
 		return err
 	}
 
@@ -171,8 +189,8 @@ func supportedAlgorithms() error {
 	return nil
 }
 
-func doRequest(reqType uint, input interface{}, output interface{}) error {
-	reqBytes, err := token.PackageRequest(input, reqType)
+func doRequest(input interface{}, output interface{}) error {
+	reqBytes, err := token.PackageRequest(input)
 	if err != nil {
 		return err
 	}
@@ -194,9 +212,7 @@ func doRequest(reqType uint, input interface{}, output interface{}) error {
 		return err
 	}
 
-	data := res.PayloadBytes()
-
-	if err := token.UnpackResponse(data, &output); err != nil {
+	if err := token.UnpackResponse(res.Payload, output); err != nil {
 		return err
 	}
 
@@ -219,7 +235,7 @@ func main() {
 	for i, f := range funcList {
 		log.Println("calling function", i)
 		if ferr = f(); ferr != nil {
-			return
+			break
 		}
 	}
 

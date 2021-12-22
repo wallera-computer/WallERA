@@ -11,7 +11,6 @@ require (
 	github.com/f-secure-foundry/armory-boot v0.0.0-20211123102803-5fa84fa5ff94
 	github.com/f-secure-foundry/tamago v0.0.0-20211209201811-ccf85bc1ae2e
 	github.com/hsanjuan/go-nfctype4 v0.0.1
-	github.com/mitchellh/mapstructure v1.4.3
 	github.com/stretchr/testify v1.7.0
 	go.uber.org/zap v1.19.1
 	golang.org/x/crypto v0.0.0-20211108221036-ceb1ce70b4fa

@@ -66,25 +66,12 @@ func main() {
 
 	t := token.NewToken()
 
-	data := mail.PayloadBytes()
-
-	req, err := token.ReadRequest(data)
-	if err != nil {
-		log.Println("cannot read request:", err)
-		return
-	}
-
-	resp, err := token.Dispatch(req, t)
+	resp, err := token.Dispatch(mail.Payload, t)
 	if err != nil {
 		log.Fatal("cannot dispatch:", err)
 	}
 
-	respBytes, err := token.MarshalResponse(resp)
-	if err != nil {
-		log.Fatal("cannot dispatch:", err)
-	}
-
-	mail.Payload = respBytes
+	mail.Payload = resp
 
 	err = client.SecureRPC{}.WriteResponse(mail)
 	if err != nil {

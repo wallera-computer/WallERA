@@ -5,8 +5,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"log"
 
-	"github.com/mitchellh/mapstructure"
 	"github.com/wallera-computer/wallera/crypto"
 )
 
@@ -19,19 +19,21 @@ const (
 )
 
 type Request struct {
-	ID   uint
-	Data interface{}
+	ID uint
 }
 
 type RandomBytesRequest struct {
+	Request
 	Amount uint64
 }
 
 type RandomBytesResponse struct {
+	Response
 	Data []byte
 }
 
 type SignRequest struct {
+	Request
 	Data           []byte
 	DerivationPath crypto.DerivationPath
 	Algorithm      crypto.Algorithm
@@ -52,39 +54,57 @@ func (sri signRequestInternal) Bytes() []byte {
 }
 
 type SignResponse struct {
+	Response
 	Data []byte
 }
 
 type PublicKeyRequest struct {
+	Request
 	DerivationPath crypto.DerivationPath
 }
 
 type PublicKeyResponse struct {
+	Response
 	Data []byte
 }
 
 type MnemonicRequest struct {
+	Request
 	DerivationPath crypto.DerivationPath
 }
 
 type MnemonicResponse struct {
+	Response
 	Words []string
 }
 
 // SupportedSignAlgorithms doesn't have inputs
 // just a response
 type SupportedSignAlgorithmsResponse struct {
+	Response
 	Algorithms []crypto.Algorithm
 }
 
+type SupportedSignAlgorithmsRequest struct {
+	Request
+}
+
 type Response struct {
-	ID   uint
-	Data interface{}
+	ID uint
 }
 
 func ReadRequest(data []byte) (Request, error) {
 	var req Request
 	return req, unmarshal(data, &req)
+}
+
+func RequestedOp(data []byte) (uint, error) {
+	var req Request
+	if err := unmarshal(data, &req); err != nil {
+		return 0, err
+	}
+
+	return req.ID, nil
 }
 
 func MarshalResponse(r Response) ([]byte, error) {
@@ -99,152 +119,137 @@ func Unmarshal(b []byte, i interface{}) error {
 	return unmarshal(b, &i)
 }
 
-func PackageRequest(req interface{}, reqCode uint) ([]byte, error) {
-	rr := Request{
-		ID:   reqCode,
-		Data: req,
-	}
-
-	return Marshal(rr)
+func PackageRequest(req interface{}) ([]byte, error) {
+	return Marshal(req)
 }
 
 func UnpackResponse(resp []byte, dest interface{}) error {
-	r := Response{}
-	if err := unmarshal(resp, &r); err != nil {
+	if err := unmarshal(resp, dest); err != nil {
 		return err
 	}
 
-	b, err := base64.StdEncoding.DecodeString(r.Data.(string))
-	if err != nil {
-		return err
-	}
-
-	return json.Unmarshal(b, dest)
+	return nil
 }
 
-func Dispatch(req Request, t crypto.Token) (Response, error) {
-	var resp Response
+func Dispatch(data []byte, t crypto.Token) ([]byte, error) {
+	var resp []byte
 	var dispatchErr error
 
-	switch req.ID {
+	log.Printf("dispatching %+v\n", data)
+
+	reqID, err := RequestedOp(data)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read op, %w", err)
+	}
+
+	switch reqID {
 	case RequestRandomBytes:
 		r := RandomBytesRequest{}
-		err := mapstructure.Decode(req.Data, &r)
-		if err != nil {
-			return Response{}, fmt.Errorf("cannot unmarshal into structure, %w", err)
+		if err := json.Unmarshal(data, &r); err != nil {
+			return nil, err
 		}
 
 		rb, err := t.RandomBytes(r.Amount)
 		if err != nil {
-			return Response{}, err
-		}
-
-		resp = Response{
-			ID: req.ID,
+			return nil, err
 		}
 
 		rbResp := RandomBytesResponse{
+			Response: Response{
+				ID: reqID,
+			},
 			Data: rb,
 		}
 
-		resp.Data, dispatchErr = marshal(rbResp)
+		resp, dispatchErr = marshal(rbResp)
 	case RequestSign:
 		r := signRequestInternal{}
-
-		err := mapstructure.Decode(req.Data, &r)
-		if err != nil {
-			return Response{}, fmt.Errorf("cannot unmarshal into structure, %w", err)
+		if err := json.Unmarshal(data, &r); err != nil {
+			return nil, err
 		}
 
 		tt := t.Clone()
 		if err := tt.Initialize(r.DerivationPath); err != nil {
-			return Response{}, err
+			return nil, err
 		}
 
 		data, err := tt.Sign(r.Bytes(), r.Algorithm)
 		if err != nil {
-			return Response{}, err
-		}
-
-		resp = Response{
-			ID: req.ID,
+			return nil, err
 		}
 
 		sResp := SignResponse{
+			Response: Response{
+				ID: reqID,
+			},
 			Data: data,
 		}
 
-		resp.Data, dispatchErr = marshal(sResp)
+		resp, dispatchErr = marshal(sResp)
 	case RequestPublicKey:
 		r := PublicKeyRequest{}
-		err := mapstructure.Decode(req.Data, &r)
-		if err != nil {
-			return Response{}, fmt.Errorf("cannot unmarshal into structure, %w", err)
+		if err := json.Unmarshal(data, &r); err != nil {
+			return nil, err
 		}
 
 		tt := t.Clone()
 		if err := tt.Initialize(r.DerivationPath); err != nil {
-			return Response{}, err
+			return nil, err
 		}
 
 		data, err := tt.PublicKey()
 		if err != nil {
-			return Response{}, err
-		}
-
-		resp = Response{
-			ID: req.ID,
+			return nil, err
 		}
 
 		pkResp := PublicKeyResponse{
+			Response: Response{
+				ID: reqID,
+			},
 			Data: data,
 		}
 
-		resp.Data, dispatchErr = marshal(pkResp)
+		resp, dispatchErr = marshal(pkResp)
 	case RequestMnemonic:
 		r := MnemonicRequest{}
-		err := mapstructure.Decode(req.Data, &r)
-		if err != nil {
-			return Response{}, fmt.Errorf("cannot unmarshal into structure, %w", err)
+		if err := json.Unmarshal(data, &r); err != nil {
+			return nil, err
 		}
 
 		tt := t.Clone()
 		if err := tt.Initialize(r.DerivationPath); err != nil {
-			return Response{}, err
+			return nil, err
 		}
 
 		data, err := tt.Mnemonic()
 		if err != nil {
-			return Response{}, err
-		}
-
-		resp = Response{
-			ID: req.ID,
+			return nil, err
 		}
 
 		mnResp := MnemonicResponse{
+			Response: Response{
+				ID: reqID,
+			},
 			Words: data,
 		}
 
-		resp.Data, dispatchErr = marshal(mnResp)
+		resp, dispatchErr = marshal(mnResp)
 	case RequestSupportedSignAlgorithms:
 		data := t.SupportedSignAlgorithms()
 
-		resp = Response{
-			ID: req.ID,
-		}
-
 		mnResp := SupportedSignAlgorithmsResponse{
+			Response: Response{
+				ID: reqID,
+			},
 			Algorithms: data,
 		}
 
-		resp.Data, dispatchErr = marshal(mnResp)
+		resp, dispatchErr = marshal(mnResp)
 	default:
-		return Response{}, fmt.Errorf("cannot handle request")
+		return nil, fmt.Errorf("cannot handle request")
 	}
 
 	return resp, dispatchErr
-
 }
 
 func unmarshal(data []byte, dest interface{}) error {

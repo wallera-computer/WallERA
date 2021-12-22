@@ -95,9 +95,14 @@ func (c *Context) RetrieveMail(appID uint) (types.Mail, error) {
 		return types.Mail{}, ErrNoMail
 	}
 
+	mailb, ok := mail.([]byte)
+	if !ok {
+		return types.Mail{}, fmt.Errorf("could not read mailbox content as byte slice")
+	}
+
 	out := types.Mail{}
 	out.AppID = appID
-	out.Payload = mail
+	out.Payload = mailb
 
 	return out, nil
 }
@@ -118,9 +123,14 @@ func (c *Context) ReadResponse(appID uint) (types.Mail, error) {
 		return types.Mail{}, ErrNoResult
 	}
 
+	mailb, ok := mail.([]byte)
+	if !ok {
+		return types.Mail{}, fmt.Errorf("could not read mailbox content as byte slice")
+	}
+
 	out := types.Mail{}
 	out.AppID = appID
-	out.Payload = mail
+	out.Payload = mailb
 
 	return out, nil
 }
@@ -220,7 +230,7 @@ func (c *Context) RunNonsecureWorld() {
 }
 
 func (c *Context) dispatchAppsCalls() {
-	c.mailbox.Range(func(keyRaw, value interface{}) bool {
+	c.mailbox.Range(func(keyRaw, _ interface{}) bool {
 		key, ok := keyRaw.(uint)
 		if !ok {
 			panic("somehow a mailbox key isn't uint")
