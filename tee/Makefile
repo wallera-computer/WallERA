@@ -51,12 +51,12 @@ trusted_applet_rust:
 	mkdir -p $(CURDIR)/trusted_os/assets
 	cp $(CURDIR)/bin/trusted_applet.elf $(CURDIR)/trusted_os/assets
 
-nonsecure_os_go: APP=nonsecure_os_go
-nonsecure_os_go: DIR=$(CURDIR)/nonsecure_os_go
-nonsecure_os_go: TEXT_START=0x80010000
-nonsecure_os_go: elf
+nonsecure_demo_os: APP=nonsecure_demo_os
+nonsecure_demo_os: DIR=$(CURDIR)/nonsecure_demo_os
+nonsecure_demo_os: TEXT_START=0x80010000
+nonsecure_demo_os: elf
 	mkdir -p $(CURDIR)/trusted_os/assets
-	cp $(CURDIR)/bin/nonsecure_os_go.elf $(CURDIR)/trusted_os/assets
+	cp $(CURDIR)/bin/nonsecure_demo_os.elf $(CURDIR)/trusted_os/assets
 
 nonsecure_os_linux: APP=nonsecure_os_linux
 nonsecure_os_linux: DIR=$(CURDIR)/nonsecure_os_linux

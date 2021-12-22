@@ -21,5 +21,5 @@ import (
 //go:embed assets/trusted_applet.elf
 var taELF []byte
 
-//go:embed assets/nonsecure_os_go.elf
+//go:embed assets/nonsecure_demo_os.elf
 var osELF []byte
