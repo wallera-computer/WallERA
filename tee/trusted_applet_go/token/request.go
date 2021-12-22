@@ -1,7 +1,6 @@
 package token
 
 import (
-	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -237,11 +236,9 @@ func Dispatch(data []byte, t crypto.Token) ([]byte, error) {
 }
 
 func unmarshal(data []byte, dest interface{}) error {
-	return json.NewDecoder(bytes.NewReader(data)).Decode(&dest)
+	return json.Unmarshal(data, dest)
 }
 
 func marshal(src interface{}) ([]byte, error) {
-	b := bytes.Buffer{}
-	err := json.NewEncoder(&b).Encode(src)
-	return b.Bytes(), err
+	return json.Marshal(src)
 }
