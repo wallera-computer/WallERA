@@ -107,35 +107,19 @@ func RequestedOp(data []byte) (uint, error) {
 	return req.ID, nil
 }
 
-func MarshalResponse(r Response) ([]byte, error) {
-	return marshal(r)
-}
-
-func Marshal(i interface{}) ([]byte, error) {
-	return marshal(i)
-}
-
-func Unmarshal(b []byte, i interface{}) error {
-	return unmarshal(b, &i)
-}
-
 func PackageRequest(req interface{}) ([]byte, error) {
-	return Marshal(req)
+	return marshal(req)
 }
 
 func UnpackResponse(resp []byte, dest interface{}) error {
-	if err := unmarshal(resp, dest); err != nil {
-		return err
-	}
-
-	return nil
+	return unmarshal(resp, dest)
 }
 
 func Dispatch(data []byte, t crypto.Token) ([]byte, error) {
 	var resp []byte
 	var dispatchErr error
 
-	log.Printf("dispatching %+v\n", data)
+	log.Printf("dispatching %+v", string(data))
 
 	reqID, err := RequestedOp(data)
 	if err != nil {
