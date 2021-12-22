@@ -21,8 +21,8 @@ import (
 
 	"github.com/wallera-computer/wallera/crypto"
 	"github.com/wallera-computer/wallera/tee/mem"
-	"github.com/wallera-computer/wallera/tee/trusted_applet_go/info"
-	"github.com/wallera-computer/wallera/tee/trusted_applet_go/token"
+	"github.com/wallera-computer/wallera/tee/cryptography_applet/info"
+	"github.com/wallera-computer/wallera/tee/cryptography_applet/token"
 	"github.com/wallera-computer/wallera/tee/trusted_os/tz/client"
 	tztypes "github.com/wallera-computer/wallera/tee/trusted_os/tz/types"
 )

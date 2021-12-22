@@ -38,10 +38,10 @@ trusted_os_signed: DIR=$(CURDIR)/trusted_os
 trusted_os_signed: TEXT_START=0x98010000
 trusted_os_signed: imx_signed
 
-trusted_applet_go: APP=trusted_applet
-trusted_applet_go: DIR=$(CURDIR)/trusted_applet_go
-trusted_applet_go: TEXT_START=0x9c010000
-trusted_applet_go: elf
+cryptography_applet: APP=trusted_applet
+cryptography_applet: DIR=$(CURDIR)/cryptography_applet
+cryptography_applet: TEXT_START=0x9c010000
+cryptography_applet: elf
 	mkdir -p $(CURDIR)/trusted_os/assets
 	cp $(CURDIR)/bin/trusted_applet.elf $(CURDIR)/trusted_os/assets
 

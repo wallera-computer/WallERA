@@ -19,7 +19,7 @@ import (
 	"github.com/f-secure-foundry/tamago/soc/imx6/dcp"
 
 	"github.com/wallera-computer/wallera/tee/mem"
-	"github.com/wallera-computer/wallera/tee/trusted_applet_go/info"
+	"github.com/wallera-computer/wallera/tee/cryptography_applet/info"
 	"github.com/wallera-computer/wallera/tee/trusted_os/tz"
 )
 
