@@ -62,3 +62,10 @@ func (ns NonsecureRPC) RetrieveResult(appID uint) (tztypes.Mail, error) {
 		&mail,
 	)
 }
+
+func ExitWithError(err error) {
+	b := make([]byte, len(err.Error()))
+
+	copy(b, []byte(err.Error()))
+	syscall.Write(666, b, uint(len(b)))
+}

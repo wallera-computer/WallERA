@@ -7,17 +7,18 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"runtime"
 	_ "unsafe"
 
 	"github.com/f-secure-foundry/GoTEE/applet"
+	_ "github.com/f-secure-foundry/GoTEE/applet"
 	"github.com/f-secure-foundry/GoTEE/syscall"
-
-	"github.com/wallera-computer/wallera/tee/mem"
 	"github.com/wallera-computer/wallera/tee/cryptography_applet/info"
 	"github.com/wallera-computer/wallera/tee/cryptography_applet/token"
+	"github.com/wallera-computer/wallera/tee/mem"
 	"github.com/wallera-computer/wallera/tee/trusted_os/tz/client"
 )
 
@@ -56,12 +57,13 @@ func testRPC() {
 }
 
 func main() {
-	defer applet.Exit()
+	defer handlePanic()
+
 	log.Printf("PL0 %s/%s (%s) • TEE user applet (Secure World)", runtime.GOOS, runtime.GOARCH, runtime.Version())
 
 	mail, err := client.SecureRPC{}.RetrieveMail(info.AppletID)
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 
 	t := token.NewToken()
@@ -75,8 +77,16 @@ func main() {
 
 	err = client.SecureRPC{}.WriteResponse(mail)
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 
 	log.Println("written response from trusted applet")
+
+	applet.Exit()
+}
+
+func handlePanic() {
+	if r := recover(); r != nil {
+		client.ExitWithError(fmt.Errorf("%v", r))
+	}
 }

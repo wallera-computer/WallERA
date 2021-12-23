@@ -7,6 +7,7 @@
 package tz
 
 import (
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"log"
@@ -29,6 +30,8 @@ var ErrNoMail = errors.New("no mail")
 var ErrNoResult = errors.New("no result")
 var ErrMailboxFull = errors.New("mailbox full")
 var ErrResultBoxFull = errors.New("result box full")
+var ErrTAExit = errors.New("ta exit")
+var ErrNonsecureExit = errors.New("nonsecure exit")
 
 type SecureRPC struct {
 	ctx *Context
@@ -394,6 +397,14 @@ func run(ctx *monitor.ExecCtx) {
 	err := ctx.Run()
 
 	log.Printf("PL1 stopped mode:%s ns:%v sp:%#.8x lr:%#.8x pc:%#.8x err:%v", mode, ns, ctx.R13, ctx.R14, ctx.R15, err)
+	errTemplate := ErrTAExit
+	if ctx.NonSecure() {
+		errTemplate = ErrNonsecureExit
+	}
+
+	if err != nil && !errors.Is(err, errTemplate) {
+		panic(err)
+	}
 }
 
 // logHandler allows to override the GoTEE default handler and avoid
@@ -410,7 +421,26 @@ func logHandler(ctx *monitor.ExecCtx) (err error) {
 			ctx.Print()
 		}
 
-		return errors.New("exit")
+		return ErrNonsecureExit
+	case ctx.R0 == syscall.SYS_EXIT:
+		return ErrTAExit
+
+	// TODO: clean this
+	case ctx.R0 == 666: // syscall.SYS_EXIT_ERROR:
+		off := int(ctx.R1 - ctx.Memory.Start)
+		buf := make([]byte, ctx.R2)
+
+		if !(off >= 0 && off < (ctx.Memory.Size-len(buf))) {
+			return errors.New("invalid read offset")
+		}
+
+		if n, err := rand.Read(buf); err != nil || n != int(ctx.R2) {
+			return errors.New("internal error")
+		}
+
+		ctx.Memory.Read(ctx.Memory.Start, off, buf)
+
+		return fmt.Errorf(string(buf))
 	default:
 		err = defaultHandler(ctx)
 	}
