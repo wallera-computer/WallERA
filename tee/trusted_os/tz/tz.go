@@ -8,6 +8,7 @@ package tz
 
 import (
 	"crypto/rand"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -22,6 +23,7 @@ import (
 	"github.com/f-secure-foundry/tamago/soc/imx6/tzasc"
 
 	"github.com/wallera-computer/wallera/tee/mem"
+	"github.com/wallera-computer/wallera/tee/trusted_os/tz/client"
 	"github.com/wallera-computer/wallera/tee/trusted_os/tz/types"
 )
 
@@ -396,13 +398,18 @@ func run(ctx *monitor.ExecCtx) {
 
 	err := ctx.Run()
 
-	log.Printf("PL1 stopped mode:%s ns:%v sp:%#.8x lr:%#.8x pc:%#.8x err:%v", mode, ns, ctx.R13, ctx.R14, ctx.R15, err)
+	log.Printf("PL1 stopped mode:%s ns:%v sp:%#.8x lr:%#.8x pc:%#.8x", mode, ns, ctx.R13, ctx.R14, ctx.R15)
 	errTemplate := ErrTAExit
 	if ctx.NonSecure() {
 		errTemplate = ErrNonsecureExit
 	}
 
 	if err != nil && !errors.Is(err, errTemplate) {
+		ce := client.ClientPanic{}
+		if errors.As(err, &ce) {
+			panic(ce)
+		}
+
 		panic(err)
 	}
 }
@@ -440,7 +447,12 @@ func logHandler(ctx *monitor.ExecCtx) (err error) {
 
 		ctx.Memory.Read(ctx.Memory.Start, off, buf)
 
-		return fmt.Errorf(string(buf))
+		ce := client.ClientPanic{}
+		if err := json.Unmarshal(buf, &ce); err != nil {
+			return fmt.Errorf("cannot unmarshal TA error, %w", err)
+		}
+
+		return ce
 	default:
 		err = defaultHandler(ctx)
 	}

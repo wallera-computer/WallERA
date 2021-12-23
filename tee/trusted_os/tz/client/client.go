@@ -1,8 +1,11 @@
 package client
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"runtime/debug"
 
 	"github.com/f-secure-foundry/GoTEE/syscall"
 	"github.com/wallera-computer/wallera/tee/trusted_os/nonsecuresyscall"
@@ -63,9 +66,27 @@ func (ns NonsecureRPC) RetrieveResult(appID uint) (tztypes.Mail, error) {
 	)
 }
 
-func ExitWithError(err error) {
-	b := make([]byte, len(err.Error()))
+type ClientPanic struct {
+	Msg        string
+	Stacktrace string
+}
 
-	copy(b, []byte(err.Error()))
-	syscall.Write(666, b, uint(len(b)))
+func (cp ClientPanic) Error() string {
+	return fmt.Sprintf("%s\n\n%s", cp.Msg, cp.Stacktrace)
+}
+
+func ExitWithError(err error) {
+	trace := debug.Stack()
+
+	p := ClientPanic{
+		Msg:        err.Error(),
+		Stacktrace: string(trace),
+	}
+
+	m, me := json.Marshal(p)
+	if me != nil {
+		panic(me)
+	}
+
+	syscall.Write(666, m, uint(len(m)))
 }
