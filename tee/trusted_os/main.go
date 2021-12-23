@@ -18,8 +18,9 @@ import (
 	"github.com/f-secure-foundry/tamago/soc/imx6"
 	"github.com/f-secure-foundry/tamago/soc/imx6/dcp"
 
-	"github.com/wallera-computer/wallera/tee/mem"
 	"github.com/wallera-computer/wallera/tee/cryptography_applet/info"
+	"github.com/wallera-computer/wallera/tee/mem"
+	"github.com/wallera-computer/wallera/tee/trusted_os/angel"
 	"github.com/wallera-computer/wallera/tee/trusted_os/tz"
 )
 
@@ -59,6 +60,7 @@ func init() {
 }
 
 func main() {
+	defer panicHandler()
 	tzCtx := tz.NewContext()
 
 	if err := tzCtx.RegisterApp(taELF, info.AppletID); err != nil {
@@ -72,4 +74,18 @@ func main() {
 	}
 
 	tzCtx.RunNonsecureWorld()
+
+	if !imx6.Native {
+		angel.SemihostingShutdown()
+	}
+}
+
+func panicHandler() {
+	if r := recover(); r != nil {
+		log.Printf("panic: %v", r)
+
+		if !imx6.Native {
+			angel.SemihostingShutdown()
+		}
+	}
 }

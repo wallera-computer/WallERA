@@ -91,7 +91,7 @@ clean:
 	@rm -fr $(CURDIR)/bin/* $(CURDIR)/trusted_os/assets/*
 
 qemu:
-	$(QEMU) -kernel $(CURDIR)/bin/trusted_os.elf
+	$(QEMU) -semihosting -kernel $(CURDIR)/bin/trusted_os.elf
 
 qemu-gdb:
 	$(QEMU) -kernel $(CURDIR)/bin/trusted_os.elf -S -s
