@@ -4,7 +4,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"log"
 
 	"github.com/wallera-computer/wallera/crypto"
 )
@@ -117,8 +116,6 @@ func UnpackResponse(resp []byte, dest interface{}) error {
 func Dispatch(data []byte, t crypto.Token) ([]byte, error) {
 	var resp []byte
 	var dispatchErr error
-
-	log.Printf("dispatching %+v", string(data))
 
 	reqID, err := RequestedOp(data)
 	if err != nil {

@@ -10,16 +10,15 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"fmt"
-	"log"
-	"os"
-	"strings"
 	"time"
 	_ "unsafe"
 
 	"github.com/f-secure-foundry/tamago/soc/imx6"
 	_ "github.com/f-secure-foundry/tamago/soc/imx6/imx6ul"
+	"go.uber.org/zap"
 
 	"github.com/wallera-computer/wallera/crypto"
+	"github.com/wallera-computer/wallera/log"
 	"github.com/wallera-computer/wallera/tee/cryptography_applet/info"
 	"github.com/wallera-computer/wallera/tee/cryptography_applet/token"
 	"github.com/wallera-computer/wallera/tee/mem"
@@ -32,6 +31,8 @@ var ramStart uint32 = mem.NonSecureStart
 
 //go:linkname ramSize runtime.ramSize
 var ramSize uint32 = mem.NonSecureSize
+
+var l *zap.SugaredLogger
 
 //go:linkname hwinit runtime.hwinit
 func hwinit() {
@@ -50,8 +51,7 @@ func printk(c byte) {
 }
 
 func init() {
-	log.SetFlags(log.Ltime)
-	log.SetOutput(os.Stdout)
+	l = log.Development().Sugar()
 
 	if !imx6.Native {
 		return
@@ -82,8 +82,7 @@ func mnemonic() error {
 		return err
 	}
 
-	log.Println("generated mnemonic")
-	log.Println(strings.Join(resp.Words, ", "))
+	l.Debugw("generated mnemonic", "words", resp.Words)
 
 	return nil
 }
@@ -108,8 +107,7 @@ func pubkey() error {
 		return err
 	}
 
-	log.Println("generated pubkey")
-	log.Println(resp.Data)
+	l.Debugw("generated pubkey", "pubkey", resp.Data)
 
 	return nil
 }
@@ -128,8 +126,7 @@ func randomBytes() error {
 		return err
 	}
 
-	log.Println("generated random bytes")
-	log.Println(len(resp.Data), resp.Data)
+	l.Debugw("generated random bytes", "data", resp.Data)
 
 	return nil
 }
@@ -159,8 +156,7 @@ func sign() error {
 		return err
 	}
 
-	log.Println("generated signature")
-	log.Println(len(resp.Data), resp.Data)
+	l.Debugw("generated signature", "signature", resp.Data)
 
 	return nil
 }
@@ -178,13 +174,12 @@ func supportedAlgorithms() error {
 		return err
 	}
 
-	log.Println("supported algorithms")
 	sa := []string{}
 	for _, a := range resp.Algorithms {
 		sa = append(sa, a.String())
 	}
 
-	log.Println(strings.Join(sa, ", "))
+	l.Debugw("supported algorithms", "algorithms", sa)
 
 	return nil
 }
@@ -205,7 +200,7 @@ func doRequest(input interface{}, output interface{}) error {
 		return err
 	}
 
-	log.Println("mail sent")
+	l.Debug("mail sent")
 
 	res, err := client.NonsecureRPC{}.RetrieveResult(m.AppID)
 	if err != nil {
@@ -220,7 +215,7 @@ func doRequest(input interface{}, output interface{}) error {
 }
 
 func main() {
-	log.Println("normal world os!")
+	l.Debug("normal world os!")
 	defer exit()
 
 	funcList := []func() error{
@@ -233,18 +228,18 @@ func main() {
 
 	var ferr error
 	for i, f := range funcList {
-		log.Println("calling function", i)
+		l.Debug("calling function", i)
 		if ferr = f(); ferr != nil {
 			break
 		}
 	}
 
 	if ferr != nil {
-		log.Println(ferr)
+		l.Debug(ferr)
 		return
 	}
 
-	log.Println("finished running")
+	l.Debug("finished running")
 
 	time.Sleep(1 * time.Second)
 }

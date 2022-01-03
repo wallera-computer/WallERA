@@ -11,7 +11,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"sync"
 
 	"github.com/f-secure-foundry/GoTEE/monitor"
@@ -21,7 +20,9 @@ import (
 	"github.com/f-secure-foundry/tamago/soc/imx6"
 	"github.com/f-secure-foundry/tamago/soc/imx6/csu"
 	"github.com/f-secure-foundry/tamago/soc/imx6/tzasc"
+	"go.uber.org/zap"
 
+	"github.com/wallera-computer/wallera/log"
 	"github.com/wallera-computer/wallera/tee/mem"
 	"github.com/wallera-computer/wallera/tee/trusted_os/tz/client"
 	"github.com/wallera-computer/wallera/tee/trusted_os/tz/types"
@@ -34,6 +35,8 @@ var ErrMailboxFull = errors.New("mailbox full")
 var ErrResultBoxFull = errors.New("result box full")
 var ErrTAExit = errors.New("ta exit")
 var ErrNonsecureExit = errors.New("nonsecure exit")
+
+var l *zap.SugaredLogger = log.Development().Sugar()
 
 type SecureRPC struct {
 	ctx *Context
@@ -208,7 +211,7 @@ func (c *Context) LoadNonsecureWorld(appContent []byte) error {
 		return fmt.Errorf("cannot load nonsecure world, %w", err)
 	}
 
-	log.Printf("PL1 loaded kernel addr:%#x size:%d entry:%#x", os.Memory.Start, len(appContent), os.R15)
+	l.Debugf("PL1 loaded kernel addr:%#x size:%d entry:%#x", os.Memory.Start, len(appContent), os.R15)
 
 	lock := true
 	if !imx6.Native {
@@ -394,11 +397,11 @@ func run(ctx *monitor.ExecCtx) {
 	mode := arm.ModeName(int(ctx.SPSR) & 0x1f)
 	ns := ctx.NonSecure()
 
-	log.Printf("PL1 starting mode:%s ns:%v sp:%#.8x pc:%#.8x", mode, ns, ctx.R13, ctx.R15)
+	l.Debugf("PL1 starting mode:%s ns:%v sp:%#.8x pc:%#.8x", mode, ns, ctx.R13, ctx.R15)
 
 	err := ctx.Run()
 
-	log.Printf("PL1 stopped mode:%s ns:%v sp:%#.8x lr:%#.8x pc:%#.8x", mode, ns, ctx.R13, ctx.R14, ctx.R15)
+	l.Debugf("PL1 stopped mode:%s ns:%v sp:%#.8x lr:%#.8x pc:%#.8x", mode, ns, ctx.R13, ctx.R14, ctx.R15)
 	errTemplate := ErrTAExit
 	if ctx.NonSecure() {
 		errTemplate = ErrNonsecureExit

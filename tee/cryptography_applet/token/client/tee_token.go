@@ -2,7 +2,6 @@ package crypto
 
 import (
 	"crypto/sha256"
-	"log"
 
 	"github.com/wallera-computer/wallera/crypto"
 	"github.com/wallera-computer/wallera/tee/cryptography_applet/info"
@@ -126,8 +125,6 @@ func doRequest(input interface{}, output interface{}) error {
 	if err != nil {
 		return err
 	}
-
-	log.Println("mail sent")
 
 	res, err := client.NonsecureRPC{}.RetrieveResult(m.AppID)
 	if err != nil {
