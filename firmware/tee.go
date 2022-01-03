@@ -6,6 +6,7 @@ import (
 	"time"
 
 	usbarmory "github.com/f-secure-foundry/tamago/board/f-secure/usbarmory/mark-two"
+	"github.com/wallera-computer/wallera/crypto"
 )
 
 // this file defines functions needed when the TEE is disabled
@@ -17,4 +18,8 @@ func loadDebugAccessory() {
 
 func resetBoard() {
 	usbarmory.Reset()
+}
+
+func tokenImpl() crypto.Token {
+	return crypto.NewDumbToken()
 }

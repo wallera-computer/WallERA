@@ -8,7 +8,6 @@ import (
 	"github.com/f-secure-foundry/tamago/soc/imx6"
 	"github.com/wallera-computer/wallera/apps"
 	"github.com/wallera-computer/wallera/apps/cosmos"
-	"github.com/wallera-computer/wallera/crypto"
 	"go.uber.org/zap"
 )
 
@@ -41,7 +40,7 @@ func main() {
 
 	l := logger()
 
-	t := crypto.NewDumbToken()
+	t := tokenImpl()
 
 	ah := apps.NewHandler()
 	ah.Register(&cosmos.Cosmos{

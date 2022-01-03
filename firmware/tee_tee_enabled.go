@@ -5,6 +5,8 @@ package main
 import (
 	"github.com/f-secure-foundry/GoTEE/syscall"
 	"github.com/f-secure-foundry/tamago/soc/imx6"
+	"github.com/wallera-computer/wallera/crypto"
+	cryptoapplet "github.com/wallera-computer/wallera/tee/cryptography_applet/token/client"
 	"github.com/wallera-computer/wallera/tee/mem"
 	_ "unsafe"
 )
@@ -42,4 +44,8 @@ func loadDebugAccessory() {
 
 func resetBoard() {
 	imx6.Reset()
+}
+
+func tokenImpl() crypto.Token {
+	return &cryptoapplet.TEEToken{}
 }
