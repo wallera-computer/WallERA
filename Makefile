@@ -59,7 +59,7 @@ dcd:
 		exit 1; \
 	fi
 
-clean:
+clean: tee_clean
 	rm -fr $(APP) $(APP).bin $(APP).imx $(APP)-signed.imx $(APP).csf $(APP).dcd $(APP)-linux
 
 install: $(APP)
@@ -76,8 +76,31 @@ setup-wallera-linux: wallera-linux
 	sudo ./wallera-linux -setup
 	sudo chown $$USER /dev/hidg0
 
+tee_demo:
+	$(MAKE) -C tee nonsecure_demo_os 
+	$(MAKE) -C tee cryptography_applet 
+	$(MAKE) -C tee trusted_os
+	mv tee/bin/trusted_os.imx tee_demo.imx
+
+tee_demo_qemu: tee_demo
+	$(MAKE) -C tee qemu
+
+tee_clean: 
+	$(MAKE) -C tee clean
+
+tee_wallera: wallera-tee 
+	$(MAKE) -C tee cryptography_applet
+	cp wallera tee/trusted_os/assets/nonsecure_os.elf
+	$(MAKE) -C tee trusted_os
+	mv tee/bin/trusted_os.imx tee_wallera.imx
+
 #### dependencies ####
 $(APP): check_tamago
+	$(GOENV) $(TAMAGO) build ${GOFLAGS} -o ${APP} ./firmware/
+
+$(APP)-tee: TEXT_START=0x80010000
+$(APP)-tee: TARGET:=$(addsuffix  ,"tee_enabled",$(TARGET))
+$(APP)-tee: check_tamago
 	$(GOENV) $(TAMAGO) build ${GOFLAGS} -o ${APP} ./firmware/
 
 test: check_tamago

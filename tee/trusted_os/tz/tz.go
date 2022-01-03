@@ -323,13 +323,13 @@ func configureTrustZone(lock bool) (err error) {
 		return
 	}
 
-	// restrict access to USB
-	if err = csu.SetSecurityLevel(8, 0, csu.SEC_LEVEL_4, false); err != nil {
+	// do not restrict access to usb
+	if err = csu.SetSecurityLevel(8, 0, csu.SEC_LEVEL_0, false); err != nil {
 		return
 	}
 
 	// set USB controller as Secure
-	if err = csu.SetAccess(4, true, false); err != nil {
+	if err = csu.SetAccess(4, false, false); err != nil {
 		return
 	}
 

@@ -8,8 +8,6 @@ package main
 
 import (
 	"fmt"
-	"log"
-	"os"
 	"time"
 	_ "unsafe"
 
@@ -17,7 +15,9 @@ import (
 	"github.com/f-secure-foundry/tamago/dma"
 	"github.com/f-secure-foundry/tamago/soc/imx6"
 	"github.com/f-secure-foundry/tamago/soc/imx6/dcp"
+	"go.uber.org/zap"
 
+	"github.com/wallera-computer/wallera/log"
 	"github.com/wallera-computer/wallera/tee/cryptography_applet/info"
 	"github.com/wallera-computer/wallera/tee/mem"
 	"github.com/wallera-computer/wallera/tee/trusted_os/angel"
@@ -37,9 +37,10 @@ var ramStart uint32 = mem.SecureStart
 //go:linkname ramSize runtime.ramSize
 var ramSize uint32 = mem.SecureSize
 
+var l *zap.SugaredLogger
+
 func init() {
-	log.SetFlags(log.Ltime)
-	log.SetOutput(os.Stdout)
+	l = log.Development().Sugar()
 
 	if imx6.Native {
 		if err := imx6.SetARMFreq(900); err != nil {
@@ -56,10 +57,11 @@ func init() {
 	dma.Init(mem.SecureDMAStart, mem.SecureDMASize)
 	dcp.DeriveKeyMemory = dma.Default()
 
-	log.Println("trusted os loaded")
+	l.Info("trusted os loaded")
 }
 
 func main() {
+
 	defer panicHandler()
 	tzCtx := tz.NewContext()
 
@@ -67,25 +69,32 @@ func main() {
 		panic(err)
 	}
 
-	log.Println("loaded ta")
+	l.Info("loaded ta")
 
 	if err := tzCtx.LoadNonsecureWorld(osELF); err != nil {
 		panic(err)
 	}
 
+	l.Info("running nonsecure world")
 	tzCtx.RunNonsecureWorld()
 
 	if !imx6.Native {
 		angel.SemihostingShutdown()
 	}
+
+	time.Sleep(500 * time.Millisecond)
+	imx6.Reset()
 }
 
 func panicHandler() {
 	if r := recover(); r != nil {
-		log.Printf("panic: %v", r)
+		l.Errorf("panic: %v", r)
 
 		if !imx6.Native {
 			angel.SemihostingShutdown()
 		}
+
+		time.Sleep(500 * time.Millisecond)
+		imx6.Reset()
 	}
 }

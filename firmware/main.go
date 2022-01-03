@@ -5,7 +5,6 @@ import (
 	"runtime/debug"
 	"time"
 
-	usbarmory "github.com/f-secure-foundry/tamago/board/f-secure/usbarmory/mark-two"
 	"github.com/f-secure-foundry/tamago/soc/imx6"
 	"github.com/wallera-computer/wallera/apps"
 	"github.com/wallera-computer/wallera/apps/cosmos"
@@ -30,8 +29,7 @@ func init() {
 		l.Fatal("running wallera on emulated hardware is not supported")
 	}
 
-	debugConsole, _ := usbarmory.DetectDebugAccessory(250 * time.Millisecond)
-	<-debugConsole
+	loadDebugAccessory()
 
 	if err := imx6.SetARMFreq(imx6.FreqLow); err != nil {
 		l.Warnf("WARNING: error setting ARM frequency: %v", err)
@@ -56,7 +54,7 @@ func main() {
 		l.Panic(err)
 	}
 
-	usbarmory.Reset()
+	resetBoard()
 }
 
 // catchPanic catches every panic(), sets the LEDs into error mode and prints the stacktrace.
@@ -68,7 +66,7 @@ func catchPanic() {
 		l.Warn("rebooting in 1 second...")
 
 		time.Sleep(1 * time.Second)
-		usbarmory.Reset()
+		resetBoard()
 	}
 }
 

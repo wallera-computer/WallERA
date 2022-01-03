@@ -6,7 +6,6 @@ import (
 	"runtime"
 	"time"
 
-	usbarmory "github.com/f-secure-foundry/tamago/board/f-secure/usbarmory/mark-two"
 	"github.com/f-secure-foundry/tamago/soc/imx6"
 	"github.com/wallera-computer/wallera/log"
 	"go.uber.org/zap"
@@ -32,7 +31,7 @@ func rebootWatcher() {
 		if buf[0] == 'r' {
 			l.Info("rebooting...")
 			time.Sleep(500 * time.Millisecond)
-			usbarmory.Reset()
+			resetBoard()
 		}
 
 		buf[0] = 0
